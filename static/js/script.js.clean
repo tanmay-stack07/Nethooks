@@ -1,0 +1,317 @@
+// Function to create a single book item HTML
+function createBookItem(book) {
+  const bookItem = document.createElement('div');
+  bookItem.classList.add('book-item');
+  bookItem.dataset.bookId = book.id;
+
+  // Generate a placeholder with the first letter of the title if no cover
+  const titleText = book.title ? book.title.charAt(0).toUpperCase() : 'B';
+  const bgColor = stringToColor(book.title || '');
+  const textColor = getContrastYIQ(bgColor);
+  
+  const description = book.description || 'No description available.';
+  const buyLink = book.buy_link || '#';
+  const author = book.author || 'Unknown Author';
+
+  bookItem.innerHTML = `
+    <div class="book-cover-container" style="background-color: ${!book.cover ? bgColor : 'transparent'}">
+      ${book.cover ? 
+        `<img src="${book.cover}" alt="${book.title}" class="book-cover" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'placeholder-cover\' style=\'background-color:${bgColor}; color:${textColor}\'>${titleText}</div>';" />` : 
+        `<div class="placeholder-cover" style="background-color:${bgColor}; color:${textColor}">${titleText}</div>`
+      }
+    </div>
+    <div class="rating">⭐ N/A</div>
+    <div class="item-info">
+      <span class="item-pill">${author.split(',')[0] || 'Book'}</span>
+      <div class="item-title" title="${book.title}">${book.title}</div>
+      <div class="item-description" title="${description}">${description}</div>
+    </div>
+  `;
+
+  // Handle the buy link redirect
+  bookItem.addEventListener('click', () => {
+    if (buyLink !== '#') {
+      window.open(buyLink, '_blank');
+    }
+  });
+
+  return bookItem;
+}
+
+// Helper functions for color generation
+function stringToColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = hash % 360;
+  return `hsl(${hue}, 70%, 30%)`;
+}
+
+function getContrastYIQ(hexcolor) {
+  // Convert hex to RGB
+  const r = parseInt(hexcolor.substr(1, 2), 16);
+  const g = parseInt(hexcolor.substr(3, 2), 16);
+  const b = parseInt(hexcolor.substr(5, 2), 16);
+  // Calculate YIQ (brightness)
+  const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+  // Return black for light colors and white for dark colors
+  return (yiq >= 128) ? 'black' : 'white';
+}
+
+// Function to add scroll buttons to carousels
+function addScrollButtons(carousel) {
+  // Only add buttons if the carousel has enough items to scroll
+  if (carousel.scrollWidth > carousel.clientWidth) {
+    const prevButton = document.createElement('button');
+    prevButton.className = 'scroll-btn left-scroll';
+    prevButton.innerHTML = '❮';
+    prevButton.addEventListener('click', () => {
+      carousel.scrollBy({ left: -300, behavior: 'smooth' });
+    });
+
+    const nextButton = document.createElement('button');
+    nextButton.className = 'scroll-btn right-scroll';
+    nextButton.innerHTML = '❯';
+    nextButton.addEventListener('click', () => {
+      carousel.scrollBy({ left: 300, behavior: 'smooth' });
+    });
+
+    // Position the buttons
+    carousel.parentNode.style.position = 'relative';
+    carousel.parentNode.insertBefore(prevButton, carousel);
+    carousel.parentNode.appendChild(nextButton);
+  }
+}
+
+// Function to fetch and display books for a given section
+async function loadBooksBySection(sectionName, elementId) {
+  const carousel = document.getElementById(elementId);
+  if (!carousel) return;
+
+  try {
+    carousel.innerHTML = '<div class="loading-spinner"></div>';
+    
+    const response = await fetch(`/api/books/section/${sectionName}`);
+    const books = await response.json();
+    
+    carousel.innerHTML = '';
+    
+    if (Array.isArray(books) && books.length > 0) {
+      books.forEach(book => {
+        const bookElement = createBookItem(book);
+        carousel.appendChild(bookElement);
+      });
+    } else {
+      carousel.innerHTML = '<div class="no-books">No books found in this section.</div>';
+    }
+    
+    // Add scroll buttons if needed
+    addScrollButtons(carousel);
+  } catch (error) {
+    console.error(`Error loading ${sectionName} books:`, error);
+    carousel.innerHTML = '<div class="error">Failed to load books. Please try again later.</div>';
+  }
+}
+
+// Function to show book preview
+function showBookPreview(book) {
+  const modal = document.getElementById('preview-modal');
+  const title = document.getElementById('preview-title');
+  const cover = document.getElementById('preview-cover');
+  const author = document.getElementById('preview-author');
+  const year = document.getElementById('preview-year');
+  const genre = document.getElementById('preview-genre');
+  const description = document.getElementById('preview-description');
+  const communityLinks = document.getElementById('community-links');
+  const relatedBooks = document.getElementById('related-books');
+
+  // Set book details
+  title.textContent = book.title || 'Untitled';
+  cover.src = book.cover || '';
+  cover.onerror = () => {
+    const bgColor = stringToColor(book.title || '');
+    const textColor = getContrastYIQ(bgColor);
+    cover.outerHTML = `<div class="placeholder-cover" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background-color:${bgColor};color:${textColor};font-size:4rem;font-weight:bold;">${(book.title || 'B').charAt(0).toUpperCase()}</div>`;
+  };
+  
+  author.textContent = book.author || 'Unknown Author';
+  year.textContent = book.publishedDate ? new Date(book.publishedDate).getFullYear() : 'N/A';
+  genre.textContent = book.categories ? book.categories[0] : 'N/A';
+  description.textContent = book.description || 'No description available.';
+
+  // Set up community links
+  communityLinks.innerHTML = `
+    <a href="#" class="community-link">
+      <span>Discord</span>
+    </a>
+    <a href="#" class="community-link">
+      <span>Goodreads</span>
+    </a>
+    <a href="#" class="community-link">
+      <span>Author's Website</span>
+    </a>
+  `;
+
+  // Show modal
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+
+  // Close modal when clicking outside content
+  modal.querySelector('.preview-backdrop').addEventListener('click', () => {
+    closePreview();
+  });
+
+  // Close button
+  modal.querySelector('.preview-close').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closePreview();
+  });
+
+  // Close with Escape key
+  document.addEventListener('keydown', function handleEscape(e) {
+    if (e.key === 'Escape') {
+      closePreview();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  });
+
+  function closePreview() {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+}
+
+// Function to create a search result item
+function createSearchResultItem(book) {
+  const item = document.createElement('div');
+  item.className = 'search-result-item';
+  item.dataset.bookId = book.id;
+  
+  const titleText = book.title ? book.title.charAt(0).toUpperCase() : 'B';
+  const bgColor = stringToColor(book.title || '');
+  const textColor = getContrastYIQ(bgColor);
+  
+  item.innerHTML = `
+    <div class="search-result-cover" style="background-color: ${!book.cover ? bgColor : 'transparent'}">
+      ${book.cover ? 
+        `<img src="${book.cover}" alt="${book.title}" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'placeholder-cover\' style=\'background-color:${bgColor}; color:${textColor}\'>${titleText}</div>';" />` : 
+        `<div class="placeholder-cover" style="background-color:${bgColor}; color:${textColor}">${titleText}</div>`
+      }
+    </div>
+    <div class="search-result-info">
+      <h4>${book.title || 'Untitled'}</h4>
+      <p>${book.authors ? book.authors.join(', ') : 'Unknown Author'}</p>
+      <p class="search-result-description">${book.description ? book.description.substring(0, 200) + '...' : 'No description available.'}</p>
+    </div>
+  `;
+
+  item.addEventListener('click', () => {
+    showBookPreview(book);
+  });
+
+  return item;
+}
+
+// Global variables
+let searchTimeout;
+const searchTrigger = document.querySelector('.search-trigger');
+const searchOverlay = document.querySelector('.search-overlay');
+const searchInput = document.querySelector('.search-input');
+const searchClose = document.querySelector('.search-close');
+const searchResultsGrid = document.getElementById('search-results-grid');
+const searchResultsSection = document.getElementById('search-results-section');
+
+// Initialize the application when DOM is fully loaded
+document.addEventListener('DOMContentLoaded', () => {
+  // Initialize carousels
+  const carousels = document.querySelectorAll('.carousel');
+  carousels.forEach(carousel => {
+    carousel.style.display = 'flex';
+    carousel.style.overflowX = 'auto';
+    carousel.style.scrollBehavior = 'smooth';
+    carousel.style.scrollbarWidth = 'none';
+    addScrollButtons(carousel);
+  });
+
+  // Set up search functionality
+  if (searchTrigger && searchOverlay && searchInput && searchClose) {
+    // Toggle search overlay
+    searchTrigger.addEventListener('focus', (e) => {
+      e.preventDefault();
+      searchOverlay.classList.add('active');
+      searchInput.focus();
+    });
+
+    // Close search overlay
+    searchClose.addEventListener('click', (e) => {
+      e.preventDefault();
+      searchOverlay.classList.remove('active');
+      searchInput.value = '';
+      searchResultsGrid.innerHTML = '';
+    });
+
+    // Search as you type with debounce
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.trim();
+      clearTimeout(searchTimeout);
+      
+      if (query.length < 2) {
+        searchResultsGrid.innerHTML = '<p class="no-results">Type at least 2 characters to search</p>';
+        return;
+      }
+
+      searchResultsGrid.innerHTML = '<div class="loading-spinner"></div>';
+      
+      searchTimeout = setTimeout(async () => {
+        try {
+          const response = await fetch(`/api/books/search?q=${encodeURIComponent(query)}`);
+          const data = await response.json();
+          
+          searchResultsGrid.innerHTML = '';
+          
+          if (data.items && data.items.length > 0) {
+            data.items.forEach(book => {
+              searchResultsGrid.appendChild(createSearchResultItem(book));
+            });
+          } else {
+            searchResultsGrid.innerHTML = '<p class="no-results">No results found. Try a different search term.</p>';
+          }
+        } catch (error) {
+          console.error('Search error:', error);
+          searchResultsGrid.innerHTML = '<p class="error">An error occurred while searching. Please try again.</p>';
+        }
+      }, 500);
+    });
+  }
+
+  // Close search with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && searchOverlay?.classList.contains('active')) {
+      searchOverlay.classList.remove('active');
+      searchInput.value = '';
+      searchResultsGrid.innerHTML = '';
+    }
+  });
+
+  // Make book items clickable to show preview
+  document.addEventListener('click', (e) => {
+    const bookItem = e.target.closest('.book-item, .search-result-item');
+    if (bookItem) {
+      e.preventDefault();
+      const book = {
+        id: bookItem.dataset.bookId || '',
+        title: bookItem.querySelector('h4, .item-title')?.textContent || 'Untitled',
+        author: bookItem.querySelector('.item-pill, .search-result-info p:first-of-type')?.textContent || 'Unknown Author',
+        description: bookItem.querySelector('.item-description, .search-result-description')?.textContent || 'No description available.',
+        cover: bookItem.querySelector('img')?.src || ''
+      };
+      showBookPreview(book);
+    }
+  });
+
+  // Load default sections
+  loadBooksBySection('manga', 'manga-carousel');
+  loadBooksBySection('fiction', 'fiction-carousel');
+  loadBooksBySection('scifi', 'scifi-carousel');
+});

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Who's Watching?</title>
+    <style>
+        body {
+            background-color: #141414;
+            color: #fff;
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+        header {
+            padding: 30px 0;
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .profiles-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 30px;
+            flex-wrap: wrap;
+            padding: 50px 20px;
+        }
+        .profile {
+            cursor: pointer;
+            width: 160px;
+            position: relative;
+        }
+        .profile .avatar-container {
+            position: relative;
+            width: 160px;
+            height: 160px;
+        }
+        .profile img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 3px solid transparent;
+            transition: border-color 0.3s;
+        }
+        .profile:hover img {
+            border-color: #fff;
+        }
+        .profile span {
+            display: block;
+            margin-top: 10px;
+            font-size: 1.2rem;
+            color: #808080;
+            transition: color 0.3s;
+        }
+        .profile:hover span {
+            color: #fff;
+        }
+        .delete-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            font-size: 50px;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+        body.manage-mode .profile .delete-overlay {
+            display: flex; /* Show in manage mode */
+        }
+        footer {
+            margin-top: 60px;
+        }
+        .action-button {
+            background-color: transparent;
+            border: 1px solid #808080;
+            color: #808080;
+            padding: 10px 25px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        .action-button:hover {
+            border-color: #fff;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <header id="main-header">Who's Watching?</header>
+    <div class="profiles-container" id="profiles"></div>
+    <footer>
+        <a href="/login" class="action-button" id="add-profile-btn">Add Profile</a>
+        <button class="action-button" id="manage-btn">Manage Profiles</button>
+        <a href="/logout" class="action-button" id="logout-btn">Logout</a>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const profilesContainer = document.getElementById('profiles');
+            const manageBtn = document.getElementById('manage-btn');
+            let manageMode = false;
+
+            const fetchAndDisplayProfiles = () => {
+                fetch('/profiles')
+                    .then(response => {
+                        if (!response.ok) {
+                            // If server response is not OK, get the error message from the body
+                            return response.json().then(err => { throw new Error(err.error || 'Server responded with an error') });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        displayProfiles(data);
+                    })
+                    .catch(error => {
+                        // Display the detailed error message in the alert
+                        alert(`Failed to load profiles: ${error.message}`);
+                    });
+            };
+
+            const displayProfiles = (profiles) => {
+                profilesContainer.innerHTML = '';
+                profiles.forEach(profile => {
+                    const profileElement = document.createElement('div');
+                    profileElement.className = 'profile';
+                    profileElement.innerHTML = `
+                        <div class="avatar-container">
+                            <img src="${profile.avatar}" alt="${profile.name}">
+                            <div class="delete-overlay">&#10006;</div>
+                        </div>
+                        <span>${profile.name}</span>
+                    `;
+                    
+                    profileElement.querySelector('.delete-overlay').addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent the profile click event
+                        if (confirm(`Are you sure you want to delete ${profile.name}?`)) {
+                            deleteProfile(profile.id);
+                        }
+                    });
+
+                    profileElement.addEventListener('click', () => {
+                        if (!manageMode) {
+                            window.location.href = '/home';
+                        }
+                    });
+
+                    profilesContainer.appendChild(profileElement);
+                });
+            };
+
+            const deleteProfile = (profileId) => {
+                fetch(`/delete_profile/${profileId}`, { method: 'DELETE' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (data.self_deleted) {
+                            // If user deleted their own profile, redirect to home to log out.
+                            window.location.href = '/';
+                        } else {
+                            // Otherwise, just refresh the list of profiles.
+                            fetchAndDisplayProfiles();
+                        }
+                    } else {
+                        alert(data.message || 'Failed to delete profile.');
+                    }
+                })
+                .catch(() => alert('Error during deletion.'));
+            };
+
+            manageBtn.addEventListener('click', () => {
+                manageMode = !manageMode;
+                document.body.classList.toggle('manage-mode', manageMode);
+                manageBtn.textContent = manageMode ? 'Done' : 'Manage Profiles';
+            });
+
+            // Initial load of profiles
+            fetchAndDisplayProfiles();
+        });
+    </script>
+</body>
+</html>

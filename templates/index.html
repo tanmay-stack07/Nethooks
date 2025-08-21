@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            color: white;
+            font-family: 'Press Start 2P', cursive; /* Pixel font */
+        }
+        #intro-video {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            object-fit: cover;
+            display: none; /* Hidden by default */
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+        .entry-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+            text-align: center;
+            cursor: pointer;
+            opacity: 1;
+            transition: opacity 1s ease-in-out;
+        }
+        .entry-screen img {
+            max-width: 300px;
+            margin-bottom: 20px;
+            image-rendering: pixelated; /* keeps pixel art sharp */
+            image-rendering: crisp-edges;
+        }
+        .entry-button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.2rem;
+            color: white;
+            background: #1a1a1a;
+            border: 2px solid white;
+            padding: 15px 25px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="entry-screen" id="entry-screen">
+    <!-- Corrected filename exactly as in your folder -->
+    <img src="{{ url_for('static', filename='images/throfinn.jpg') }}" alt="Pixel art character">
+    <button class="entry-button">Ready to enter the world of books?</button>
+</div>
+
+    <video id="intro-video" preload="auto">
+        <source src="{{ url_for('static', filename='videos/site_intro-2.mp4') }}" type="video/mp4">
+    </video>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const entryScreen = document.getElementById('entry-screen');
+            const video = document.getElementById('intro-video');
+
+            entryScreen.addEventListener('click', () => {
+                entryScreen.style.opacity = '0';
+
+                setTimeout(() => {
+                    entryScreen.style.display = 'none';
+                    video.style.display = 'block';
+                    video.play(); // Play with sound, allowed after user click
+                    setTimeout(() => video.style.opacity = '1', 50); // Fade in video
+                }, 1000); // Wait for fade-out to finish
+            });
+
+            // Auto start after 8 seconds
+            setTimeout(() => {
+                entryScreen.click();
+            }, 8000);
+
+            video.addEventListener('ended', () => {
+                window.location.href = "/login";
+            });
+        });
+    </script>
+</body>
+</html>

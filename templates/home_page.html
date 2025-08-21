@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nethooks - Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- Search Overlay -->
+    <div class="search-overlay">
+        <div class="search-header">
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Titles, people, genres">
+                <button class="search-close">✕</button>
+            </div>
+        </div>
+        <div class="search-results-container">
+            <h3 class="search-results-title">Search Results</h3>
+            <div class="search-results-grid" id="search-results-grid"></div>
+        </div>
+    </div>
+
+    <header class="main-header">
+        <div class="nav-left">
+            <a href="/"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Nethooks Logo" class="logo"></a>
+            <nav>
+                <ul>
+                    <li><a href="#" class="active">Home</a></li>
+                    <li><a href="#manga-carousel">Manga</a></li>
+                    <li><a href="#fiction-carousel">Fiction</a></li>
+                    <li><a href="#scifi-carousel">Sci-Fi</a></li>
+                    <li><a href="#philosophy-carousel">Philosophy</a></li>
+                    <li><a href="#comics-carousel">Comics</a></li>
+                </ul>
+            </nav>
+        </div>
+        <div class="nav-right">
+            <div class="search-bar">
+                <input type="text" class="search-trigger" placeholder="Search for books...">
+                <div class="search-icon">🔍</div>
+            </div>
+            <a href="/profiles_page">
+                <img src="{{ url_for('static', filename='images/throfinn.jpg') }}" alt="Profile" class="profile-icon">
+            </a>
+        </div>
+    </header>
+
+    <!-- Book Preview Modal -->
+    <div class="preview-modal" id="preview-modal">
+        <div class="preview-backdrop"></div>
+        <div class="preview-container">
+            <button class="preview-close">✕</button>
+            <div class="preview-content">
+                <div class="preview-left">
+                    <div class="preview-poster">
+                        <img id="preview-cover" src="" alt="Book Cover">
+                    </div>
+                    <div class="preview-actions">
+                        <button class="preview-play">▶ Play</button>
+                        <button class="preview-add">+</button>
+                    </div>
+                </div>
+                <div class="preview-details">
+                    <h2 id="preview-title"></h2>
+                    <div class="preview-meta">
+                        <span id="preview-year"></span>
+                        <span id="preview-author"></span>
+                        <span id="preview-genre"></span>
+                    </div>
+                    <p id="preview-description" class="preview-description"></p>
+                    <div class="preview-community">
+                        <h4>Community</h4>
+                        <div class="community-links" id="community-links">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="preview-related">
+                <h3>More Like This</h3>
+                <div class="related-books" id="related-books">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="content-wrapper">
+        <section class="hero-section">
+            <video autoplay muted loop id="hero-video">
+                <source src="{{ url_for('static', filename='videos/site_intro-2.mp4') }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <div class="hero-content">
+                <h1 class="hero-title">Discover Your Next Favorite Book</h1>
+                <p class="hero-description">
+                    Stream from a massive library of fiction, manga, and more.
+                </p>
+                <div class="hero-buttons">
+                    <button class="read-now-btn">▶ Browse Now</button>
+                    <button class="more-info-btn">+ My List</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="books-container" id="search-results-section" style="display: none;">
+            <h2 class="section-title">🔍 Search Results</h2>
+            <div class="carousel" id="search-results-carousel"></div>
+        </section>
+
+        <section class="books-container">
+            <h2 class="section-title">📚 Manga</h2>
+            <p class="section-subtitle">Read the stories behind your favorite shows</p>
+            <div class="carousel" id="manga-carousel"></div>
+        </section>
+
+        <section class="books-container">
+            <h2 class="section-title">✨ Fiction</h2>
+            <p class="section-subtitle">Made-up stories that transport you to other worlds</p>
+            <div class="carousel" id="fiction-carousel"></div>
+        </section>
+
+        <section class="books-container">
+            <h2 class="section-title">🌌 Sci-Fi</h2>
+            <p class="section-subtitle">Worlds of advanced technology and alien life</p>
+            <div class="carousel" id="scifi-carousel"></div>
+        </section>
+
+        <section class="books-container">
+            <h2 class="section-title">🧠 Philosophy</h2>
+            <p class="section-subtitle">Stoics and modern thinkers to sharpen the mind</p>
+            <div class="carousel" id="philosophy-carousel"></div>
+        </section>
+
+        <section class="books-container">
+            <h2 class="section-title">🎨 Comics & Graphic Novels</h2>
+            <p class="section-subtitle">Iconic heroes and groundbreaking tales</p>
+            <div class="carousel" id="comics-carousel"></div>
+        </section>
+    </main>
+
+    <!-- Toasts -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+
+</html>

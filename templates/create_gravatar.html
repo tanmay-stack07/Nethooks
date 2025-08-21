@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Up Your Gravatar</title>
+    <style>
+        body { background-color: #141414; color: #fff; font-family: Arial, sans-serif; text-align: center; padding-top: 100px; }
+        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #444; border-radius: 8px; }
+        .gravatar-button { background-color: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 1.2rem; cursor: pointer; text-decoration: none; display: block; margin: 20px auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome!</h1>
+        <p>Your account has been created with the email: <strong>{{ user_email }}</strong>.</p>
+        <p>To get your personal avatar, please link your email with a Gravatar account.</p>
+        <p>This ensures you have a unique and consistent avatar across many sites.</p>
+        <a href="https://en.gravatar.com/gravatars/new/" class="gravatar-button" target="_blank">Go to Gravatar to Create Your Avatar</a>
+        <p>After you've set up your Gravatar, you can <a href="{{ url_for('profiles_page') }}" style="color: #fff;">return to the profiles page</a>.</p>
+    </div>
+</body>
+</html>

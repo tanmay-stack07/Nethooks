@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nethooks</title>
+    <style>
+        body { background-color: #141414; color: #fff; font-family: Arial, sans-serif; text-align: center; padding-top: 100px; }
+        .container { max-width: 400px; margin: auto; padding: 20px; border: 1px solid #444; border-radius: 8px; }
+        .login-form input[type="email"] { width: 90%; padding: 10px; margin-bottom: 20px; border-radius: 5px; border: 1px solid #333; background-color: #222; color: #fff; }
+        .login-form button { background-color: #e50914; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        p.info { color: #888; font-size: 0.9em; }
+        ul.flashes { list-style: none; padding: 0; margin: 0 0 15px 0; }
+        ul.flashes li { margin: 8px 0; padding: 10px; border-radius: 6px; font-size: 0.95em; }
+        ul.flashes li.success { background: #143d14; color: #c9f7c9; border: 1px solid #2a6d2a; }
+        ul.flashes li.info { background: #12263a; color: #c9e7ff; border: 1px solid #274865; }
+        ul.flashes li.error { background: #3a1212; color: #ffd1d1; border: 1px solid #6b2525; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Nethooks</h1>
+        <h2>Sign In or Sign Up</h2>
+        <p class="info">Enter your email to continue to your profile.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <ul class="flashes">
+            {% for category, message in messages %}
+              <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form class="login-form" method="POST" action="{{ url_for('login') }}">
+            <input type="email" name="email" placeholder="Enter your email" required>
+            <button type="submit">Continue</button>
+        </form>
+    </div>
+</body>
+</html>
