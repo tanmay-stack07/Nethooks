@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book Watchlist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121720;
+      --panel-2: #0f141c;
+      --text: #e6edf3;
+      --muted: #9fb0c3;
+      --primary: #4cc9f0;
+      --accent: #a78bfa;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 100% -10%, rgba(76,201,240,.08), transparent 60%),
+                  radial-gradient(1000px 600px at 0% 110%, rgba(167,139,250,.08), transparent 60%),
+                  var(--bg);
+    }
+
+    /* Header */
+    header {
+      position: sticky; top: 0; z-index: 10;
+      backdrop-filter: saturate(1.2) blur(8px);
+      background: linear-gradient(180deg, rgba(11,15,20,.85), rgba(11,15,20,.60));
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 16px 20px; }
+    .row { display: flex; align-items: center; gap: 16px; }
+    .title { font-weight: 700; letter-spacing: .3px; font-size: 20px; }
+    .spacer { flex: 1; }
+
+    /* Input area */
+    .add-box {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: var(--shadow);
+    }
+    .add-box input {
+      flex: 1; background: transparent; border: none; outline: none; color: var(--text);
+      font-size: 14px; padding: 10px;
+    }
+    .select {
+      background: #0c121a; color: var(--text); border: 1px solid rgba(255,255,255,.08);
+      padding: 8px 10px; border-radius: 10px; font-size: 13px;
+    }
+    .btn {
+      background: linear-gradient(180deg, #1a2130, #151b28);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,.08);
+      padding: 10px 14px; border-radius: 12px; cursor: pointer;
+      transition: transform .15s ease, border-color .15s ease, box-shadow .2s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(76,201,240,.45); box-shadow: 0 8px 18px rgba(76,201,240,.12); }
+    .btn-primary { background: linear-gradient(180deg, #1c2a39, #162130); border-color: rgba(76,201,240,.35); color: #c8f1ff; }
+    .btn-danger { border-color: rgba(239,68,68,.35); }
+    .btn-icon { width: 42px; aspect-ratio: 1; display: grid; place-items: center; font-weight: 800; font-size: 18px; }
+
+    /* Layout */
+    main { max-width: 1200px; margin: 18px auto; padding: 0 20px; display: grid; grid-template-columns: 260px 1fr; gap: 18px; }
+
+    /* Shelves */
+    .shelves {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: var(--radius);
+      padding: 14px; box-shadow: var(--shadow);
+      height: calc(100vh - 150px); overflow: auto;
+    }
+    .shelves-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .shelf-list { display: grid; gap: 8px; }
+    .shelf {
+      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px;
+      padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,.05);
+      background: #0d141d; cursor: pointer; position: relative;
+      transition: transform .12s ease, border-color .15s ease, background .2s ease;
+    }
+    .shelf:hover { transform: translateX(2px); border-color: rgba(167,139,250,.35); background: #0f1723; }
+    .shelf.active { border-color: rgba(76,201,240,.45); box-shadow: inset 0 0 0 1px rgba(76,201,240,.25); }
+    .shelf .actions { display: flex; gap: 6px; opacity: .85; }
+    .shelf input {
+      width: 100%; background: transparent; border: none; outline: none; color: var(--text);
+      font-weight: 600;
+    }
+
+    /* Books panel */
+    .panel {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: var(--radius);
+      padding: 14px; box-shadow: var(--shadow);
+    }
+    .books-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+
+    .book {
+      position: relative; padding: 14px; border-radius: 12px; background: #0e1520; border: 1px solid rgba(255,255,255,.06);
+      display: grid; grid-template-rows: auto 1fr auto; gap: 10px; min-height: 120px; overflow: hidden;
+      transition: transform .12s ease, box-shadow .25s ease, border-color .15s ease;
+      isolation: isolate;
+    }
+    .book:hover { transform: translateY(-2px); border-color: rgba(167,139,250,.35); box-shadow: 0 12px 28px rgba(167,139,250,.15); }
+    .book::before {
+      content: ""; position: absolute; inset: -1px; border-radius: inherit; z-index: -1;
+      background: radial-gradient(260px 140px at var(--mx, 50%) var(--my, 50%), rgba(76,201,240,.10), transparent 60%);
+      transition: background .1s ease;
+    }
+    .book-title { font-weight: 700; letter-spacing: .2px; }
+    .book-shelf { color: var(--muted); font-size: 12px; }
+    .book-actions { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+    .book-actions .left { display: flex; gap: 6px; align-items: center; }
+    .book input[type="text"] {
+      width: 100%; background: transparent; border: 1px dashed rgba(255,255,255,.15); color: var(--text);
+      border-radius: 8px; padding: 6px 8px; font-weight: 600;
+    }
+    .pill { font-size: 11px; padding: 4px 8px; border-radius: 999px; background: rgba(76,201,240,.12); color: #b9efff; border: 1px solid rgba(76,201,240,.35); }
+
+    footer { max-width: 1200px; margin: 24px auto; padding: 0 20px; color: var(--muted); font-size: 12px; }
+
+    /* Utility */
+    .hidden { display: none !important; }
+    .muted { color: var(--muted); }
+    .divider { height: 1px; background: rgba(255,255,255,.06); margin: 10px 0; }
+    .ml-auto { margin-left: auto; }
+
+    /* Stars background */
+    .stars-bg { position: fixed; inset: 0; overflow: hidden; z-index: 0;
+      background: radial-gradient(ellipse at bottom, #262626 0%, #000 100%);
+    }
+    .stars-wrap { position: absolute; inset: 0; will-change: transform; }
+    .star-layer { position: absolute; top: 0; left: 0; width: 100%; height: 2000px; }
+    .star-dot { position: absolute; top: 0; left: 0; border-radius: 50%; background: transparent; }
+    .star-dot.dup { top: 2000px; }
+    @keyframes scrollStars {
+      from { transform: translateY(0); }
+      to { transform: translateY(-2000px); }
+    }
+    .scroll-slow { animation: scrollStars linear infinite; animation-duration: 50s; }
+    .scroll-med  { animation: scrollStars linear infinite; animation-duration: 100s; }
+    .scroll-fast { animation: scrollStars linear infinite; animation-duration: 150s; }
+
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      .shelves { height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Stars Background (React-free port of shadcn stars) -->
+  <div class="stars-bg" aria-hidden="true">
+    <div id="starsWrap" class="stars-wrap">
+      <div class="star-layer scroll-slow">
+        <div id="stars-1" class="star-dot" style="width:1px;height:1px;"></div>
+        <div id="stars-1-dup" class="star-dot dup" style="width:1px;height:1px;"></div>
+      </div>
+      <div class="star-layer scroll-med">
+        <div id="stars-2" class="star-dot" style="width:2px;height:2px;"></div>
+        <div id="stars-2-dup" class="star-dot dup" style="width:2px;height:2px;"></div>
+      </div>
+      <div class="star-layer scroll-fast">
+        <div id="stars-3" class="star-dot" style="width:3px;height:3px;"></div>
+        <div id="stars-3-dup" class="star-dot dup" style="width:3px;height:3px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <div class="container row">
+      <div class="title">📚 Watchlist</div>
+      <div class="spacer"></div>
+      <a href="/creator" class="btn creator-btn" title="Creator" style="text-decoration:none">Creator</a>
+      <div class="add-box" style="min-width: 640px; max-width: 100%; width: 100%">
+        <input id="book-input" type="text" placeholder="Add a book (e.g., Meditations by Marcus Aurelius)" />
+        <select id="shelf-select" class="select"></select>
+        <button id="add-book" class="btn btn-primary btn-icon" title="Add">+</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <aside class="shelves">
+      <div class="shelves-header">
+        <strong>Shelves</strong>
+        <button id="new-shelf" class="btn btn-primary">+ New Shelf</button>
+      </div>
+      <div id="shelf-list" class="shelf-list"></div>
+    </aside>
+
+    <section class="panel">
+      <div class="books-header">
+        <strong id="current-shelf-name">My Library</strong>
+        <span id="book-count" class="muted"></span>
+        <div class="spacer"></div>
+        <button id="rename-shelf" class="btn">Rename Shelf</button>
+        <button id="delete-shelf" class="btn btn-danger">Delete Shelf</button>
+      </div>
+      <div class="divider"></div>
+      <div id="books" class="books-grid"></div>
+    </section>
+  </main>
+
+  <footer class="container">
+    Tip: Hover on a card and move your mouse to see the spotlight effect. Your shelves and books are saved locally.
+  </footer>
+
+  <script>
+    // Stars background generator (port of the TSX demo to vanilla JS)
+    (function initStars(){
+      function generateStars(count, color){
+        const shadows = [];
+        for (let i=0;i<count;i++){
+          const x = Math.floor(Math.random() * 4000) - 2000;
+          const y = Math.floor(Math.random() * 4000) - 2000;
+          shadows.push(`${x}px ${y}px ${color}`);
+        }
+        return shadows.join(', ');
+      }
+      const color = '#ffffff';
+      const s1 = document.getElementById('stars-1');
+      const s1d = document.getElementById('stars-1-dup');
+      const s2 = document.getElementById('stars-2');
+      const s2d = document.getElementById('stars-2-dup');
+      const s3 = document.getElementById('stars-3');
+      const s3d = document.getElementById('stars-3-dup');
+      if (s1 && s2 && s3){
+        const bs1 = generateStars(1000, color);
+        const bs2 = generateStars(400, color);
+        const bs3 = generateStars(200, color);
+        s1.style.boxShadow = bs1; s1d.style.boxShadow = bs1;
+        s2.style.boxShadow = bs2; s2d.style.boxShadow = bs2;
+        s3.style.boxShadow = bs3; s3d.style.boxShadow = bs3;
+      }
+      // Mouse parallax
+      const wrap = document.getElementById('starsWrap');
+      let factor = 0.05;
+      function onMove(e){
+        const cx = window.innerWidth/2, cy = window.innerHeight/2;
+        const ox = -(e.clientX - cx) * factor;
+        const oy = -(e.clientY - cy) * factor;
+        wrap && (wrap.style.transform = `translate(${ox}px, ${oy}px)`);
+      }
+      window.addEventListener('mousemove', onMove);
+    })();
+
+    const STORAGE_KEY = 'bookWatchlistV1';
+    // Mirror key used by My Library page
+    const LIB_KEY = 'myList';
+
+    const state = {
+      shelves: {},
+      activeShelfId: ''
+    };
+
+    // ----- Library (myList) helpers -----
+    function getMyList() {
+      try { const arr = JSON.parse(localStorage.getItem(LIB_KEY)); return Array.isArray(arr) ? arr : []; } catch { return []; }
+    }
+    function setMyList(arr) {
+      localStorage.setItem(LIB_KEY, JSON.stringify(arr || []));
+      // Inform other pages to update without manual refresh
+      try { window.dispatchEvent(new CustomEvent('myList:changed')); } catch {}
+    }
+    function addToMyListFromTitle(title) {
+      const list = getMyList();
+      const exists = list.some(b => (b && (b.title||'').toLowerCase().trim() === title.toLowerCase().trim()));
+      if (!exists) {
+        list.unshift({ id: 'wl:' + uid(), title: title.trim(), author: '', cover: '', info_link: '', buy_link: '', createdAt: Date.now(), source: 'watchlist' });
+        setMyList(list);
+      }
+    }
+    function removeFromMyListByTitle(title) {
+      const list = getMyList();
+      const t = title.toLowerCase().trim();
+      const filtered = list.filter(b => !b || ((b.title||'').toLowerCase().trim() !== t));
+      setMyList(filtered);
+    }
+    function updateMyListTitle(oldTitle, newTitle){
+      const list = getMyList();
+      const ot = (oldTitle||'').toLowerCase().trim();
+      const existsNew = list.some(b => (b && (b.title||'').toLowerCase().trim() === (newTitle||'').toLowerCase().trim()));
+      let changed = false;
+      const updated = list.map(b => {
+        if (b && (b.title||'').toLowerCase().trim() === ot) {
+          if (!existsNew) { changed = true; return { ...b, title: (newTitle||'').trim() }; }
+        }
+        return b;
+      });
+      if (changed) setMyList(updated);
+    }
+
+    const els = {
+      bookInput: document.getElementById('book-input'),
+      shelfSelect: document.getElementById('shelf-select'),
+      addBook: document.getElementById('add-book'),
+      shelfList: document.getElementById('shelf-list'),
+      newShelf: document.getElementById('new-shelf'),
+      books: document.getElementById('books'),
+      currentShelfName: document.getElementById('current-shelf-name'),
+      bookCount: document.getElementById('book-count'),
+      renameShelf: document.getElementById('rename-shelf'),
+      deleteShelf: document.getElementById('delete-shelf'),
+    };
+
+    function uid() { return Math.random().toString(36).slice(2, 9); }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function load() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.shelves) Object.assign(state, parsed);
+        } catch {}
+      }
+      if (!Object.keys(state.shelves).length) {
+        const lib = uid();
+        const toRead = uid();
+        state.shelves[lib] = { id: lib, name: 'My Library', books: [] };
+        state.shelves[toRead] = { id: toRead, name: 'To Read', books: [] };
+        state.activeShelfId = lib;
+      }
+      if (!state.activeShelfId) state.activeShelfId = Object.keys(state.shelves)[0];
+    }
+
+    function setActive(id) {
+      state.activeShelfId = id; save(); render();
+    }
+
+    function addShelf(name = 'New Shelf') {
+      const id = uid();
+      state.shelves[id] = { id, name, books: [] };
+      state.activeShelfId = id;
+      save(); render();
+    }
+
+    function renameShelfPrompt() {
+      const sh = state.shelves[state.activeShelfId];
+      if (!sh) return;
+      const name = prompt('Rename shelf:', sh.name);
+      if (name && name.trim()) {
+        sh.name = name.trim(); save(); render();
+      }
+    }
+
+    function deleteShelf() {
+      const id = state.activeShelfId;
+      const sh = state.shelves[id];
+      if (!sh) return;
+      if (!confirm(`Delete shelf "${sh.name}"? Books will be removed from this shelf.`)) return;
+      delete state.shelves[id];
+      state.activeShelfId = Object.keys(state.shelves)[0] || '';
+      save(); render();
+    }
+
+    function addBookToShelf(title, shelfId) {
+      const id = shelfId || state.activeShelfId;
+      const sh = state.shelves[id];
+      if (!sh) return;
+      const book = { id: uid(), title: title.trim(), shelfId: id, createdAt: Date.now() };
+      sh.books.unshift(book);
+      save();
+      // Mirror to My Library simple list
+      if (book.title) addToMyListFromTitle(book.title);
+      render();
+    }
+
+    function moveBook(bookId, fromShelfId, toShelfId) {
+      if (fromShelfId === toShelfId) return;
+      const from = state.shelves[fromShelfId];
+      const to = state.shelves[toShelfId];
+      if (!from || !to) return;
+      const idx = from.books.findIndex(b => b.id === bookId);
+      if (idx === -1) return;
+      const [book] = from.books.splice(idx, 1);
+      book.shelfId = toShelfId;
+      to.books.unshift(book);
+      save(); render();
+    }
+
+    function deleteBook(bookId, shelfId) {
+      const sh = state.shelves[shelfId];
+      if (!sh) return;
+      const book = sh.books.find(b => b.id === bookId);
+      sh.books = sh.books.filter(b => b.id !== bookId);
+      save();
+      // Mirror removal in My Library by title
+      if (book && book.title) removeFromMyListByTitle(book.title);
+      render();
+    }
+
+    function editBook(bookId, shelfId, newTitle) {
+      const sh = state.shelves[shelfId];
+      if (!sh) return;
+      const book = sh.books.find(b => b.id === bookId);
+      if (!book) return;
+      const oldTitle = book.title;
+      book.title = newTitle.trim();
+      save();
+      if (oldTitle && book.title && oldTitle.toLowerCase().trim() !== book.title.toLowerCase().trim()) {
+        updateMyListTitle(oldTitle, book.title);
+      }
+      render();
+    }
+
+    function renderShelves() {
+      const { shelves, activeShelfId } = state;
+
+      // Sidebar shelves
+      els.shelfList.innerHTML = '';
+      Object.values(shelves).forEach(sh => {
+        const node = document.createElement('div');
+        node.className = 'shelf' + (sh.id === activeShelfId ? ' active' : '');
+        node.innerHTML = `
+          <input value="${sh.name.replaceAll('"','&quot;')}" aria-label="Shelf name" />
+          <div class="actions">
+            <button class="btn btn-icon" title="Select">→</button>
+            <button class="btn btn-icon" title="Delete">✕</button>
+          </div>
+        `;
+        const [input, selectBtn, delBtn] = [
+          node.querySelector('input'),
+          node.querySelectorAll('button')[0],
+          node.querySelectorAll('button')[1]
+        ];
+        input.addEventListener('change', e => {
+          const v = e.target.value.trim();
+          if (v) { sh.name = v; if (sh.id === activeShelfId) els.currentShelfName.textContent = v; save(); }
+        });
+        selectBtn.addEventListener('click', () => setActive(sh.id));
+        delBtn.addEventListener('click', () => {
+          if (Object.keys(state.shelves).length <= 1) return alert('Keep at least one shelf.');
+          if (!confirm(`Delete shelf "${sh.name}"?`)) return;
+          if (sh.id === activeShelfId) {
+            const rest = Object.keys(state.shelves).filter(k => k !== sh.id);
+            state.activeShelfId = rest[0] || '';
+          }
+          delete state.shelves[sh.id];
+          save(); render();
+        });
+        node.addEventListener('click', (e) => {
+          if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') setActive(sh.id);
+        });
+        els.shelfList.appendChild(node);
+      });
+
+      // Header select
+      els.shelfSelect.innerHTML = '';
+      Object.values(shelves).forEach(sh => {
+        const opt = document.createElement('option');
+        opt.value = sh.id; opt.textContent = sh.name; if (sh.id === activeShelfId) opt.selected = true;
+        els.shelfSelect.appendChild(opt);
+      });
+    }
+
+    function renderBooks() {
+      const sh = state.shelves[state.activeShelfId];
+      if (!sh) return;
+      els.currentShelfName.textContent = sh.name;
+      els.bookCount.textContent = sh.books.length ? `• ${sh.books.length} book${sh.books.length>1?'s':''}` : '';
+
+      els.books.innerHTML = '';
+      sh.books.forEach(book => {
+        const node = document.createElement('div');
+        node.className = 'book';
+        node.innerHTML = `
+          <div class="book-title" contenteditable="true">${book.title.replaceAll('<','&lt;')}</div>
+          <div class="book-shelf">
+            <span class="pill">${state.shelves[book.shelfId]?.name || ''}</span>
+          </div>
+          <div class="book-actions">
+            <div class="left">
+              <select class="select move"></select>
+              <button class="btn btn-icon" title="Delete">✕</button>
+            </div>
+            <span class="muted" style="font-size:12px">Added · ${new Date(book.createdAt).toLocaleDateString()}</span>
+          </div>
+        `;
+
+        // Spotlight follow effect
+        node.addEventListener('pointermove', (e) => {
+          const rect = node.getBoundingClientRect();
+          const mx = e.clientX - rect.left; const my = e.clientY - rect.top;
+          node.style.setProperty('--mx', `${mx}px`);
+          node.style.setProperty('--my', `${my}px`);
+        });
+
+        const editable = node.querySelector('.book-title');
+        editable.addEventListener('blur', () => {
+          const v = editable.textContent.trim();
+          if (!v) { editable.textContent = book.title; return; }
+          if (v !== book.title) editBook(book.id, book.shelfId, v);
+        });
+        editable.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); editable.blur(); } });
+
+        const sel = node.querySelector('select.move');
+        Object.values(state.shelves).forEach(sh2 => {
+          const opt = document.createElement('option');
+          opt.value = sh2.id; opt.textContent = sh2.name; if (sh2.id === book.shelfId) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', (e) => moveBook(book.id, book.shelfId, e.target.value));
+
+        const del = node.querySelector('button');
+        del.addEventListener('click', () => deleteBook(book.id, book.shelfId));
+
+        els.books.appendChild(node);
+      });
+    }
+
+    function render() { renderShelves(); renderBooks(); }
+
+    // Events
+    els.addBook.addEventListener('click', () => {
+      const title = els.bookInput.value.trim();
+      if (!title) return els.bookInput.focus();
+      addBookToShelf(title, els.shelfSelect.value);
+      els.bookInput.value = '';
+      els.bookInput.focus();
+    });
+    els.bookInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') els.addBook.click(); });
+    els.shelfSelect.addEventListener('change', (e) => setActive(e.target.value));
+    els.newShelf.addEventListener('click', () => addShelf());
+    els.renameShelf.addEventListener('click', renameShelfPrompt);
+    els.deleteShelf.addEventListener('click', deleteShelf);
+
+    // Init
+    load();
+    // One-time sync shelves -> myList (idempotent per title)
+    (function syncMyListFromShelves(){
+      try {
+        const all = Object.values(state.shelves).flatMap(sh => sh.books || []);
+        all.forEach(b => { if (b && b.title) addToMyListFromTitle(b.title); });
+      } catch {}
+    })();
+    render();
+  </script>
+</body>
+</html>

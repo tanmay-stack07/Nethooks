@@ -29,10 +29,11 @@
                 <ul>
                     <li><a href="#" class="active">Home</a></li>
                     <li><a href="#manga-carousel">Manga</a></li>
-                    <li><a href="#fiction-carousel">Fiction</a></li>
                     <li><a href="#scifi-carousel">Sci-Fi</a></li>
                     <li><a href="#philosophy-carousel">Philosophy</a></li>
                     <li><a href="#comics-carousel">Comics</a></li>
+                    <li><a href="/my_library">My Library</a></li>
+                    <li><a href="/creator" class="btn creator-btn">Creator</a></li>
                 </ul>
             </nav>
         </div>
@@ -41,8 +42,8 @@
                 <input type="text" class="search-trigger" placeholder="Search for books...">
                 <div class="search-icon">🔍</div>
             </div>
-            <a href="/profiles_page">
-                <img src="{{ url_for('static', filename='images/throfinn.jpg') }}" alt="Profile" class="profile-icon">
+            <a href="{% if current_user.is_authenticated %}{{ url_for('profile_card') }}?name={{ current_user.name|urlencode }}&email={{ current_user.email|urlencode }}&avatar={{ current_user.avatar|urlencode }}&handle={{ current_user.name|lower|replace(' ', '')|urlencode }}{% else %}{{ url_for('login') }}{% endif %}">
+                <img src="{{ current_user.avatar if current_user.is_authenticated else url_for('static', filename='images/throfinn.jpg') }}" alt="Profile" class="profile-icon">
             </a>
         </div>
     </header>
@@ -58,7 +59,7 @@
                         <img id="preview-cover" src="" alt="Book Cover">
                     </div>
                     <div class="preview-actions">
-                        <button class="preview-play">▶ Play</button>
+                        <button class="preview-play" style="display:none">Action</button>
                         <button class="preview-add">+</button>
                     </div>
                 </div>
@@ -88,38 +89,29 @@
     </div>
 
     <main class="content-wrapper">
-        <section class="hero-section">
-            <video autoplay muted loop id="hero-video">
-                <source src="{{ url_for('static', filename='videos/site_intro-2.mp4') }}" type="video/mp4">
-                Your browser does not support the video tag.
-            </video>
-            <div class="hero-content">
-                <h1 class="hero-title">Discover Your Next Favorite Book</h1>
-                <p class="hero-description">
-                    Stream from a massive library of fiction, manga, and more.
-                </p>
+        <section class="hero-carousel-container">
+            <div class="hero-carousel-slides" id="hero-carousel-slides">
+                <!-- Hero slides will be dynamically inserted here by JavaScript -->
+            </div>
+            <div class="hero-content-overlay">
+                <h1 class="hero-title">The Power of Philosophy</h1>
+                <p class="hero-description">Explore the depths of human thought and wisdom through our curated collection of philosophical works.</p>
                 <div class="hero-buttons">
-                    <button class="read-now-btn">▶ Browse Now</button>
-                    <button class="more-info-btn">+ My List</button>
+                    <a href="#philosophy-carousel" class="btn btn-primary">Philosophy</a>
                 </div>
             </div>
+            <button class="hero-carousel-nav prev" id="hero-prev">&#10094;</button>
+            <button class="hero-carousel-nav next" id="hero-next">&#10095;</button>
         </section>
+        
+        
+        
 
-        <section class="books-container" id="search-results-section" style="display: none;">
-            <h2 class="section-title">🔍 Search Results</h2>
-            <div class="carousel" id="search-results-carousel"></div>
-        </section>
-
+        <!-- Books by Genre (Google Books sections) below video rows -->
         <section class="books-container">
             <h2 class="section-title">📚 Manga</h2>
             <p class="section-subtitle">Read the stories behind your favorite shows</p>
             <div class="carousel" id="manga-carousel"></div>
-        </section>
-
-        <section class="books-container">
-            <h2 class="section-title">✨ Fiction</h2>
-            <p class="section-subtitle">Made-up stories that transport you to other worlds</p>
-            <div class="carousel" id="fiction-carousel"></div>
         </section>
 
         <section class="books-container">
@@ -139,6 +131,7 @@
             <p class="section-subtitle">Iconic heroes and groundbreaking tales</p>
             <div class="carousel" id="comics-carousel"></div>
         </section>
+        
     </main>
 
     <!-- Toasts -->

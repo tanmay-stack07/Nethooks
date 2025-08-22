@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Library • Nethooks</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .library-header { display:flex; align-items:center; justify-content:space-between; padding: 20px 30px; }
+    .shelves-bar { display:flex; gap:10px; flex-wrap:wrap; padding: 0 30px 20px; }
+    .shelf-chip { padding:8px 14px; background:#2a2a2a; color:#e5e5e5; border-radius:999px; cursor:pointer; border:1px solid #3a3a3a; }
+    .shelf-chip.active { background:#e50914; color:#fff; border-color:#e50914; }
+    .shelf-actions { margin-left:auto; display:flex; gap:8px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap:16px; padding:0 30px 40px; }
+    .card { background:#181818; border-radius:8px; overflow:hidden; border:1px solid #262626; }
+    .card .thumb { aspect-ratio: 2/3; width:100%; background:#222; display:flex; align-items:center; justify-content:center; color:#aaa; font-size:2rem; }
+    .card .body { padding:10px; color:#e5e5e5; }
+    .card h4 { margin:0 0 6px; font-size:0.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .card p { margin:0; font-size:0.8rem; color:#aaa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .card .row { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+    .btn-small { padding:6px 10px; border:none; border-radius:4px; background:#333; color:#fff; cursor:pointer; }
+    .btn-small.danger { background:#b91c1c; }
+    .muted { color:#aaa; font-size:0.9rem; padding: 0 30px; }
+
+    /* Stars background */
+    .stars-bg { position: fixed; inset: 0; overflow: hidden; z-index: 0; pointer-events: none;
+      background: radial-gradient(ellipse at bottom, #262626 0%, #000 100%);
+    }
+    .stars-wrap { position: absolute; inset: 0; will-change: transform; }
+    .star-layer { position: absolute; top: 0; left: 0; width: 100%; height: 2000px; }
+    .star-dot { position: absolute; top: 0; left: 0; border-radius: 50%; background: transparent; }
+    .star-dot.dup { top: 2000px; }
+    @keyframes scrollStars {
+      from { transform: translateY(0); }
+      to { transform: translateY(-2000px); }
+    }
+    .scroll-slow { animation: scrollStars linear infinite; animation-duration: 50s; }
+    .scroll-med  { animation: scrollStars linear infinite; animation-duration: 100s; }
+    .scroll-fast { animation: scrollStars linear infinite; animation-duration: 150s; }
+
+    /* Ensure app UI layers above stars */
+    body > *:not(.stars-bg) { position: relative; z-index: 1; }
+  </style>
+</head>
+<body>
+  <!-- Stars Background -->
+  <div class="stars-bg" aria-hidden="true">
+    <div id="starsWrap" class="stars-wrap">
+      <div class="star-layer scroll-slow">
+        <div id="stars-1" class="star-dot" style="width:1px;height:1px;"></div>
+        <div id="stars-1-dup" class="star-dot dup" style="width:1px;height:1px;"></div>
+      </div>
+      <div class="star-layer scroll-med">
+        <div id="stars-2" class="star-dot" style="width:2px;height:2px;"></div>
+        <div id="stars-2-dup" class="star-dot dup" style="width:2px;height:2px;"></div>
+      </div>
+      <div class="star-layer scroll-fast">
+        <div id="stars-3" class="star-dot" style="width:3px;height:3px;"></div>
+        <div id="stars-3-dup" class="star-dot dup" style="width:3px;height:3px;"></div>
+      </div>
+    </div>
+  </div>
+  <header class="main-header">
+    <div class="nav-left">
+      <a href="/"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Nethooks Logo" class="logo" /></a>
+      <nav>
+        <ul>
+          <li><a href="/">Home</a></li>
+          <li><a href="#" class="active">My Library</a></li>
+          <li><a href="/creator" class="btn creator-btn">Creator</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="nav-right"></div>
+  </header>
+
+  <div class="library-header">
+    <h1>My Library</h1>
+    <div class="shelf-actions"></div>
+  </div>
+
+  <p class="muted" id="subtitle">Your saved books are stored locally in this browser.</p>
+  <div class="grid" id="books-grid"></div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script>
+    // Stars background initializer (vanilla JS)
+    (function initStars(){
+      function generateStars(count, color){
+        const shadows = [];
+        for (let i=0;i<count;i++){
+          const x = Math.floor(Math.random() * 4000) - 2000;
+          const y = Math.floor(Math.random() * 4000) - 2000;
+          shadows.push(`${x}px ${y}px ${color}`);
+        }
+        return shadows.join(', ');
+      }
+      const color = '#ffffff';
+      const s1 = document.getElementById('stars-1');
+      const s1d = document.getElementById('stars-1-dup');
+      const s2 = document.getElementById('stars-2');
+      const s2d = document.getElementById('stars-2-dup');
+      const s3 = document.getElementById('stars-3');
+      const s3d = document.getElementById('stars-3-dup');
+      if (s1 && s2 && s3){
+        const bs1 = generateStars(1000, color);
+        const bs2 = generateStars(400, color);
+        const bs3 = generateStars(200, color);
+        s1.style.boxShadow = bs1; s1d.style.boxShadow = bs1;
+        s2.style.boxShadow = bs2; s2d.style.boxShadow = bs2;
+        s3.style.boxShadow = bs3; s3d.style.boxShadow = bs3;
+      }
+      const wrap = document.getElementById('starsWrap');
+      const factor = 0.05;
+      window.addEventListener('mousemove', (e) => {
+        const cx = window.innerWidth/2, cy = window.innerHeight/2;
+        const ox = -(e.clientX - cx) * factor;
+        const oy = -(e.clientY - cy) * factor;
+        wrap && (wrap.style.transform = `translate(${ox}px, ${oy}px)`);
+      });
+    })();
+
+    function showToast(message, type='warn') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const el = document.createElement('div');
+      el.className = `toast ${type}`; el.textContent = message;
+      container.appendChild(el);
+      setTimeout(() => { try { container.removeChild(el); } catch(_){} }, 3000);
+    }
+    
+    const grid = document.getElementById('books-grid');
+
+    // ----- Watchlist (shelves UI) sync helpers -----
+    const WL_KEY = 'bookWatchlistV1';
+    function getWatchlistState(){
+      try { const o = JSON.parse(localStorage.getItem(WL_KEY)); return o && typeof o === 'object' ? o : { shelves:{}, activeShelfId:''}; } catch { return { shelves:{}, activeShelfId:''}; }
+    }
+    function setWatchlistState(o){ localStorage.setItem(WL_KEY, JSON.stringify(o)); }
+    function ensureLibraryShelf(state){
+      let libId = Object.keys(state.shelves).find(id => state.shelves[id]?.name === 'My Library');
+      if (!libId){
+        libId = Math.random().toString(36).slice(2,9);
+        state.shelves[libId] = { id: libId, name: 'My Library', books: [] };
+        if (!state.activeShelfId) state.activeShelfId = libId;
+      }
+      return libId;
+    }
+    function syncWatchlistFromMyList(){
+      const state = getWatchlistState();
+      const libId = ensureLibraryShelf(state);
+      const list = getList();
+      // Build a set by title to avoid dups
+      const have = new Set((state.shelves[libId].books||[]).map(b => (b.title||'').toLowerCase().trim()));
+      list.forEach(b => {
+        const t = (b && b.title ? b.title : '').toLowerCase().trim();
+        if (t && !have.has(t)) {
+          state.shelves[libId].books.unshift({ id: Math.random().toString(36).slice(2,9), title: b.title, shelfId: libId, createdAt: b.createdAt || Date.now() });
+        }
+      });
+      // Remove books in shelf that are no longer in myList
+      const titles = new Set(list.map(b => (b.title||'').toLowerCase().trim()));
+      state.shelves[libId].books = (state.shelves[libId].books||[]).filter(b => titles.has((b.title||'').toLowerCase().trim()))
+      setWatchlistState(state);
+    }
+    
+    function getList() {
+      try {
+        const raw = localStorage.getItem('myList');
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+      } catch { return []; }
+    }
+    function setList(arr) {
+      localStorage.setItem('myList', JSON.stringify(arr || []));
+    }
+
+    function renderBooks() {
+      const books = getList();
+      grid.innerHTML = '';
+      if (!books.length) {
+        grid.innerHTML = '<div class="muted">No books yet. Add some from Home using the + button.</div>';
+        // Keep watchlist in sync even when empty
+        syncWatchlistFromMyList();
+        return;
+      }
+      books.forEach(b => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const titleText = (b.title || 'B').charAt(0).toUpperCase();
+        const cover = b.cover ? `<img class="thumb" src="${b.cover}" alt="${b.title}">` : `<div class="thumb">${titleText}</div>`;
+        card.innerHTML = `
+          ${cover}
+          <div class="body">
+            <h4 title="${b.title}">${b.title || 'Untitled'}</h4>
+            <p title="${b.author}">${b.author || 'Unknown'}</p>
+            <div class="row">
+              <button class="btn-small" data-buy>Buy</button>
+              <button class="btn-small danger" data-remove>Remove</button>
+            </div>
+          </div>
+        `;
+        card.querySelector('[data-buy]').onclick = () => {
+          const url = b.buy_link && /^https?:\/\//i.test(b.buy_link) ? b.buy_link : (b.info_link || '#');
+          if (url && url !== '#') window.open(url, '_blank');
+        };
+        card.querySelector('[data-remove]').onclick = () => {
+          const arr = getList().filter(x => x && x.id !== b.id);
+          setList(arr);
+          showToast('Removed from My List', 'success');
+          // Mirror changes to watchlist state
+          syncWatchlistFromMyList();
+          renderBooks();
+        };
+        grid.appendChild(card);
+      });
+      // Sync after render to update watchlist mirror
+      syncWatchlistFromMyList();
+    }
+
+    // Initial render + sync
+    renderBooks();
+    // Live update on cross-page/local changes
+    window.addEventListener('myList:changed', () => {
+      renderBooks();
+    });
+    window.addEventListener('storage', (e) => {
+      if (e && e.key === 'myList') renderBooks();
+    });
+  </script>
+</body>
+</html>

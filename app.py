@@ -188,6 +188,74 @@ def get_book_data(item):
         'ratingsCount': volume_info.get('ratingsCount')
     }
 
+# ---- Shelves/Watchlist helpers ----
+def create_default_shelves(user_id):
+    """Ensure default shelves exist for a user: To Read, Currently Reading, Read"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS shelves (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id VARCHAR(128) NOT NULL,
+                name VARCHAR(100) NOT NULL,
+                is_default TINYINT(1) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_user_name (user_id, name)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS shelf_books (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                shelf_id INT NOT NULL,
+                book_id VARCHAR(64) NOT NULL,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uniq_shelf_book (shelf_id, book_id),
+                CONSTRAINT fk_shelf_books_shelf FOREIGN KEY (shelf_id) REFERENCES shelves(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        """)
+
+        defaults = ["To Read", "Currently Reading", "Read"]
+        created = []
+        for name in defaults:
+            try:
+                cursor.execute("INSERT IGNORE INTO shelves (user_id, name, is_default) VALUES (%s, %s, 1)", (user_id, name))
+                if cursor.rowcount:
+                    created.append(name)
+            except Exception:
+                pass
+        conn.commit()
+        logger.debug("Default shelves created for %s: %s", user_id, created)
+    except Exception as e:
+        logger.error("create_default_shelves error: %s", e)
+    finally:
+        try:
+            cursor.close(); conn.close()
+        except Exception:
+            pass
+
+def get_shelf_by_name(user_id, name):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM shelves WHERE user_id = %s AND name = %s", (user_id, name))
+        return cursor.fetchone()
+    finally:
+        cursor.close(); conn.close()
+
+def fetch_book_by_id(volume_id):
+    try:
+        api_url = f"https://www.googleapis.com/books/v1/volumes/{requests.utils.quote(volume_id)}?projection=full"
+        if GOOGLE_BOOKS_API_KEY:
+            api_url += f"&key={GOOGLE_BOOKS_API_KEY}"
+        data = fetch_api_data(api_url)
+        if not data:
+            return None
+        return get_book_data(data)
+    except Exception as e:
+        logger.error("fetch_book_by_id error: %s", e)
+        return None
+
 def build_books_query(raw_query: str):
     """Build an optimized Google Books API query string from a user query.
     Rules:
@@ -236,19 +304,42 @@ def build_books_query(raw_query: str):
 # --- Routes ---
 @app.route('/')
 def index():
-    if current_user.is_authenticated:
-        return redirect(url_for('profiles_page'))
-    return render_template('index.html')
+    # Serve the new hero UI as the main homepage
+    return render_template('home_page.html')
 
 @app.route('/profiles_page')
 @login_required
 def profiles_page():
     return render_template('profiles_page.html')
 
-@app.route('/home')
+@app.route('/profile_card')
 @login_required
+def profile_card():
+    # Serve the built React app (Vite) from profile-card-app/dist
+    dist_dir = os.path.join(app.root_path, 'profile-card-app', 'dist')
+    index_path = os.path.join(dist_dir, 'index.html')
+    if not os.path.exists(index_path):
+        # Provide a friendly message if not built yet
+        return ("Profile app not built. Please run 'npm install' and 'npm run build' in profile-card-app/", 503)
+    # We don't need to inject data server-side; the React app reads query params
+    return send_from_directory(dist_dir, 'index.html')
+
+@app.route('/profile_card/<path:filename>')
+@login_required
+def profile_card_assets(filename):
+    # Serve static assets for the React app under /profile_card/
+    dist_dir = os.path.join(app.root_path, 'profile-card-app', 'dist')
+    return send_from_directory(dist_dir, filename)
+
+@app.route('/home')
 def home():
-    return render_template('home_page.html')
+    # Canonicalize to root
+    return redirect(url_for('index'))
+
+@app.route('/creator')
+def creator():
+    """Public page showing the site's creator info."""
+    return render_template('creator.html')
 
 @app.route('/profiles')
 @login_required
@@ -518,6 +609,11 @@ def login():
                 login_user(user)
                 # Persist email in session for convenience
                 session['user_email'] = email
+                # Ensure default shelves for this user
+                try:
+                    create_default_shelves(user.id)
+                except Exception:
+                    pass
                 return redirect(url_for('profiles_page'))
 
     # GET or fallthrough renders the email login form
@@ -572,6 +668,177 @@ def serve_pdf(filename):
         else:
             # If no fallback is provided, show the not found page
             return render_template('pdf_not_found.html', filename=filename), 404
+
+# --- Video static serving and listing ---
+@app.route('/carousels/<path:filename>')
+def serve_video(filename):
+    """Serve video files from the carousels directory."""
+    videos_dir = os.path.join(app.root_path, 'carousels')
+    return send_from_directory(videos_dir, filename)
+
+@app.route('/api/videos')
+def list_videos():
+    """Return a list of available videos from the carousels directory."""
+    videos_dir = os.path.join(app.root_path, 'carousels')
+    exts = {'.mp4', '.webm', '.ogg'}
+    items = []
+    try:
+        if os.path.isdir(videos_dir):
+            for name in sorted(os.listdir(videos_dir)):
+                _, ext = os.path.splitext(name)
+                if ext.lower() in exts:
+                    stem = os.path.splitext(name)[0]
+                    poster = None
+                    # Poster image with same stem (jpg/png/webp)
+                    for pext in ('.jpg', '.jpeg', '.png', '.webp'):
+                        cand = f"{stem}{pext}"
+                        if os.path.exists(os.path.join(videos_dir, cand)):
+                            poster = url_for('serve_video', filename=cand)
+                            break
+                    items.append({
+                        'filename': name,
+                        'url': url_for('serve_video', filename=name),
+                        'poster': poster,
+                        'title': stem.replace('_', ' ').title()
+                    })
+    except Exception as e:
+        logger.error('Error listing videos: %s', e)
+    return jsonify(items)
+
+# ---- My Library page ----
+@app.route('/my_library')
+@login_required
+def my_library():
+    return render_template('my_library.html')
+
+# ---- Shelves API ----
+@app.route('/api/shelves/defaults', methods=['POST'])
+@login_required
+def api_ensure_defaults():
+    create_default_shelves(current_user.id)
+    return jsonify({'ok': True})
+
+@app.route('/api/shelves', methods=['GET', 'POST'])
+@login_required
+def api_shelves():
+    if request.method == 'GET':
+        conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute("SELECT id, name, is_default FROM shelves WHERE user_id = %s ORDER BY is_default DESC, name", (current_user.id,))
+            return jsonify(cursor.fetchall())
+        finally:
+            cursor.close(); conn.close()
+    else:
+        name = (request.json or {}).get('name', '').strip()
+        if not name:
+            return jsonify({'error': 'name required'}), 400
+        conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute("INSERT INTO shelves (user_id, name, is_default) VALUES (%s, %s, 0)", (current_user.id, name))
+            conn.commit()
+            return jsonify({'id': cursor.lastrowid, 'name': name, 'is_default': 0}), 201
+        except mysql.connector.Error as e:
+            return jsonify({'error': str(e)}), 400
+        finally:
+            cursor.close(); conn.close()
+
+@app.route('/api/shelves/<int:shelf_id>', methods=['PATCH', 'DELETE'])
+@login_required
+def api_shelf_modify(shelf_id):
+    conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT * FROM shelves WHERE id = %s AND user_id = %s", (shelf_id, current_user.id))
+        shelf = cursor.fetchone()
+        if not shelf:
+            return jsonify({'error': 'not found'}), 404
+        if request.method == 'PATCH':
+            if shelf.get('is_default'):
+                return jsonify({'error': 'cannot rename default shelf'}), 400
+            name = (request.json or {}).get('name', '').strip()
+            if not name:
+                return jsonify({'error': 'name required'}), 400
+            cursor.execute("UPDATE shelves SET name = %s WHERE id = %s", (name, shelf_id))
+            conn.commit()
+            return jsonify({'ok': True})
+        else:
+            if shelf.get('is_default'):
+                return jsonify({'error': 'cannot delete default shelf'}), 400
+            cursor.execute("DELETE FROM shelves WHERE id = %s", (shelf_id,))
+            conn.commit()
+            return jsonify({'ok': True})
+    finally:
+        cursor.close(); conn.close()
+
+@app.route('/api/shelves/<int:shelf_id>/books', methods=['GET', 'POST'])
+@login_required
+def api_shelf_books(shelf_id):
+    conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
+    try:
+        # Ownership check
+        cursor.execute("SELECT * FROM shelves WHERE id = %s AND user_id = %s", (shelf_id, current_user.id))
+        shelf = cursor.fetchone()
+        if not shelf:
+            return jsonify({'error': 'not found'}), 404
+
+        if request.method == 'GET':
+            limit = int(request.args.get('limit', 40))
+            cursor.execute("SELECT book_id FROM shelf_books WHERE shelf_id = %s ORDER BY added_at DESC LIMIT %s", (shelf_id, limit))
+            ids = [row['book_id'] for row in cursor.fetchall()]
+            # Fetch details for each id (simple N calls; could be optimized)
+            books = []
+            for vid in ids:
+                b = fetch_book_by_id(vid)
+                if b and b.get('cover'):
+                    books.append(b)
+            return jsonify(books)
+        else:
+            book_id = (request.json or {}).get('book_id', '').strip()
+            if not book_id:
+                return jsonify({'error': 'book_id required'}), 400
+            try:
+                cursor.execute("INSERT IGNORE INTO shelf_books (shelf_id, book_id) VALUES (%s, %s)", (shelf_id, book_id))
+                conn.commit()
+                return jsonify({'ok': True, 'added': cursor.rowcount > 0})
+            except mysql.connector.Error as e:
+                return jsonify({'error': str(e)}), 400
+    finally:
+        cursor.close(); conn.close()
+
+@app.route('/api/shelves/<int:shelf_id>/books/<book_id>', methods=['DELETE'])
+@login_required
+def api_shelf_book_delete(shelf_id, book_id):
+    conn = get_db_connection(); cursor = conn.cursor()
+    try:
+        # Ownership check
+        cursor.execute("SELECT 1 FROM shelves WHERE id = %s AND user_id = %s", (shelf_id, current_user.id))
+        if not cursor.fetchone():
+            return jsonify({'error': 'not found'}), 404
+        cursor.execute("DELETE FROM shelf_books WHERE shelf_id = %s AND book_id = %s", (shelf_id, book_id))
+        conn.commit()
+        return jsonify({'ok': True})
+    finally:
+        cursor.close(); conn.close()
+
+@app.route('/api/mylist/add', methods=['POST'])
+@login_required
+def api_mylist_add():
+    body = request.get_json(silent=True) or {}
+    book_id = (body.get('book_id') or '').strip()
+    if not book_id:
+        return jsonify({'error': 'book_id required'}), 400
+    create_default_shelves(current_user.id)
+    # Get To Read shelf
+    shelf = get_shelf_by_name(current_user.id, 'To Read')
+    if not shelf:
+        return jsonify({'error': 'default shelf missing'}), 500
+    conn = get_db_connection(); cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT IGNORE INTO shelf_books (shelf_id, book_id) VALUES (%s, %s)", (shelf['id'], book_id))
+        conn.commit()
+        added = cursor.rowcount > 0
+        return jsonify({'ok': True, 'shelf_id': shelf['id'], 'added': added})
+    finally:
+        cursor.close(); conn.close()
 
 # Lightweight health endpoint that avoids DB access
 @app.route('/health')

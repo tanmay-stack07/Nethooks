@@ -1,0 +1,670 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Creator • Particle Text — Tanmay Patil • AI Enthusiast</title>
+    <style>
+      /* Minimal, self-contained styles for this page */
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #000;
+        color: #fff;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+      }
+      .wrap {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: #0a0a0a;
+        border-bottom: 1px solid #1f1f1f;
+      }
+      header a {
+        color: #9aa1a9;
+        text-decoration: none;
+      }
+      header a:hover { color: #fff; }
+      .main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      .panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        max-width: 1100px;
+      }
+      .canvas-frame {
+        border: 1px solid #2a2a2a;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        overflow: hidden;
+        width: 100%;
+      }
+      canvas { display: block; width: 100%; height: auto; }
+      .hint {
+        text-align: center;
+        color: #bdbdbd;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .title { font-weight: 600; }
+
+      /* Rainbow animated GitHub button (shadcn-inspired) */
+      @keyframes rainbowShift {
+        0% { background-position: 0% 0%; }
+        100% { background-position: 200% 0%; }
+      }
+
+      .footer-cta { margin-top: 4px; display: flex; justify-content: center; gap: 12px; }
+
+      .rainbow-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        user-select: none;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        color: #111;
+        border: calc(0.08 * 1rem) solid transparent;
+        background-image:
+          linear-gradient(#ffffff, #ffffff),
+          linear-gradient(#ffffff 50%, rgba(255,255,255,0.6) 80%, rgba(0,0,0,0)),
+          linear-gradient(90deg, hsl(0,100%,63%), hsl(90,100%,63%), hsl(210,100%,63%), hsl(195,100%,63%), hsl(270,100%,63%));
+        background-size: auto, auto, 200% auto;
+        background-origin: border-box;
+        background-clip: padding-box, border-box, border-box;
+        transition: transform 0.2s ease, color 0.2s ease;
+        animation: rainbowShift 6s linear infinite;
+        z-index: 0;
+      }
+      .rainbow-btn:hover { transform: scale(1.05); }
+      .rainbow-btn:active { transform: scale(0.95); }
+      .rainbow-btn[disabled] { opacity: 0.5; pointer-events: none; }
+      .rainbow-btn::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -20%;
+        width: 60%;
+        height: 20%;
+        transform: translateX(-50%);
+        background: linear-gradient(90deg, hsl(0,100%,63%), hsl(90,100%,63%), hsl(210,100%,63%), hsl(195,100%,63%), hsl(270,100%,63%));
+        filter: blur(calc(0.8 * 1rem));
+        z-index: 0;
+      }
+      .rainbow-btn > * { position: relative; z-index: 1; }
+      .rainbow-btn .right { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+      .black-btn .right { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
+
+      /* Glass Card styles */
+      .glass-demo { display: flex; align-items: center; justify-content: center; width: 100%; padding: 10px; }
+      .glass-group { perspective: 1000px; width: min(680px, 92vw); }
+      .glass-card {
+        position: relative;
+        min-height: 300px;
+        border-radius: 50px;
+        background: linear-gradient(135deg, #18181b, #000);
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        transition: transform 500ms ease, box-shadow 500ms ease;
+        transform-style: preserve-3d;
+      }
+      .glass-group:hover .glass-card {
+        transform: rotate3d(1, 1, 0, 30deg);
+        box-shadow: rgba(0,0,0,0.3) 30px 50px 25px -40px, rgba(0,0,0,0.1) 0 25px 30px 0;
+      }
+      .glass-inner {
+        position: absolute; inset: 8px;
+        border-radius: 55px;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+        border-left: 1px solid rgba(255,255,255,0.2);
+        background: linear-gradient(to bottom, rgba(255,255,255,0.3), rgba(255,255,255,0.1));
+        backdrop-filter: blur(6px);
+        transform: translate3d(0,0,25px);
+        transform-style: preserve-3d;
+      }
+      .glass-content { position: relative; transform: translate3d(0,0,26px); }
+      .glass-content .pad { padding: 100px 28px 0 28px; }
+      .glass-title { display:block; font-size: 18px; font-weight: 900; color: #fff; }
+      .glass-desc { display:block; margin-top: 10px; font-size: 13px; line-height: 1.4; color: #d4d4d8; }
+      .glass-desc p { margin: 6px 0; }
+      .glass-desc a { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+      .glass-desc a:hover { color: #e5e7eb; }
+      .glass-circles { position: absolute; top: 0; right: 0; transform-style: preserve-3d; }
+      .glass-circle { position: absolute; aspect-ratio: 1/1; border-radius: 9999px; background: rgba(255,255,255,0.1); box-shadow: -10px 10px 20px rgba(100,100,111,0.2); transition: transform 500ms ease; }
+      .glass-group:hover .glass-circle { transform: translate3d(0,0,120px); }
+      .glass-logo { position: absolute; top: 30px; right: 30px; width: 50px; aspect-ratio:1/1; display:grid; place-content:center; border-radius: 9999px; background:#fff; box-shadow: -10px 10px 20px rgba(100,100,111,0.2); transform: translate3d(0,0,100px); transition: transform 500ms ease; }
+      .glass-group:hover .glass-logo { transform: translate3d(0,0,120px); }
+
+      /* Liquid Glass button (no React, pure HTML/CSS) */
+      .liquid-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform 200ms ease, filter 200ms ease;
+        will-change: transform;
+        isolation: isolate;
+        overflow: hidden;
+        background: rgba(255,255,255,0.04);
+      }
+      .liquid-btn:hover { transform: scale(1.05); }
+      .liquid-btn:active { transform: scale(0.97); }
+      .liquid-btn .liquid-shadow {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        box-shadow:
+          0 0 6px rgba(0,0,0,0.03),
+          0 2px 6px rgba(0,0,0,0.08),
+          inset 3px 3px 0.5px -3px rgba(0,0,0,0.9),
+          inset -3px -3px 0.5px -3px rgba(0,0,0,0.85),
+          inset 1px 1px 1px -0.5px rgba(0,0,0,0.6),
+          inset -1px -1px 1px -0.5px rgba(0,0,0,0.6),
+          inset 0 0 6px 6px rgba(0,0,0,0.12),
+          inset 0 0 2px 2px rgba(0,0,0,0.06),
+          0 0 12px rgba(255,255,255,0.15);
+        z-index: 0;
+      }
+      .liquid-btn .liquid-backdrop {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        /* Animated soft highlights to simulate liquid movement */
+        background:
+          radial-gradient(120% 120% at 20% 20%, rgba(255,255,255,0.18), rgba(255,255,255,0.06) 40%, rgba(255,255,255,0) 60%),
+          linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02));
+        background-size: 200% 200%, 100% 100%;
+        background-position: 0% 0%, 0% 0%;
+        /* Blur glass effect */
+        backdrop-filter: blur(8px) saturate(120%);
+        /* If supported, SVG filter adds additional distortion; otherwise harmless */
+        filter: url(#container-glass);
+        z-index: 0;
+        pointer-events: none;
+      }
+      .liquid-btn .liquid-content { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; }
+
+      /* Shine sweep */
+      @keyframes shineSlide {
+        0% { transform: translateX(-120%); }
+        100% { transform: translateX(120%); }
+      }
+      .liquid-btn::after {
+        content: "";
+        position: absolute;
+        inset: -20% -60% -20% -60%;
+        background: linear-gradient(115deg, rgba(255,255,255,0) 35%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 65%);
+        transform: translateX(-120%);
+        animation: shineSlide 2.8s ease-in-out infinite;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      /* Slow background flow */
+      @keyframes liquidFlow {
+        0% { background-position: 0% 0%, 0% 0%; }
+        50% { background-position: 60% 40%, 0% 0%; }
+        100% { background-position: 100% 80%, 0% 0%; }
+      }
+      .liquid-btn .liquid-backdrop { animation: liquidFlow 7s ease-in-out infinite alternate; }
+
+      /* Respect reduced motion */
+      @media (prefers-reduced-motion: reduce) {
+        .liquid-btn::after { animation: none; }
+        .liquid-btn .liquid-backdrop { animation: none; }
+      }
+
+      /* Black GitHub button */
+      .black-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 40px;
+        padding: 0 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        user-select: none;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        background: #0a0a0a;
+        border: 1px solid #1f1f1f;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 18px rgba(0,0,0,0.25);
+        transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+      }
+      .black-btn:hover { transform: translateY(-1px); background: #111; }
+      .black-btn:active { transform: translateY(0); background: #0c0c0c; }
+      .black-btn[disabled] { opacity: 0.5; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <a href="/" aria-label="Back to Home">← Back</a>
+        <div>Creator • Particle Text — Tanmay Patil • AI Enthusiast</div>
+        <div></div>
+      </header>
+      <main class="main">
+        <div class="panel">
+          <div class="canvas-frame">
+            <canvas id="particleCanvas" width="1000" height="500" aria-label="Particle Text Canvas"></canvas>
+          </div>
+          <div class="hint">
+            <div class="title">Particle Text Effect</div>
+            Right-click and hold while moving mouse to destroy particles • Words change automatically every 4 seconds
+          </div>
+          <div class="footer-cta">
+            <div class="glass-demo">
+              <div class="glass-group">
+                <div class="glass-card">
+                  <div class="glass-inner"></div>
+                  <div class="glass-content">
+                    <div class="pad">
+                      <span class="glass-title">Hi, I’m Tanmay — the creator of Nethooks.</span>
+                      <div class="glass-desc">
+                        <p>You know Netflix and chill 😉… but here, it’s all about swapping the chill with screens for peace with pages.</p>
+                        <p>At Nethooks, bookworms get their own version of the vibe — stories to binge, knowledge to spark, and a community that’s all about connection (without the awkward “what are we watching?” debate). 📚✨</p>
+                        <p><strong>For future projects or collaborations:</strong><br/>
+                        📞 <a href="tel:9823104743">9823104743</a><br/>
+                        📧 <a href="mailto:tanmaygpatil@gmail.com">tanmaygpatil@gmail.com</a></p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="glass-circles">
+                    <div class="glass-circle" style="width:170px; top:8px; right:8px; transform: translate3d(0,0,20px);"></div>
+                    <div class="glass-circle" style="width:140px; top:10px; right:10px; transform: translate3d(0,0,40px); transition-delay:.4s;"></div>
+                    <div class="glass-circle" style="width:110px; top:17px; right:17px; transform: translate3d(0,0,60px); transition-delay:.8s;"></div>
+                    <div class="glass-circle" style="width:80px; top:23px; right:23px; transform: translate3d(0,0,80px); transition-delay:1.2s;"></div>
+                  </div>
+                  <div class="glass-logo">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29.667 31.69" class="w-5" aria-hidden="true">
+                      <path d="M12.827,1.628A1.561,1.561,0,0,1,14.31,0h2.964a1.561,1.561,0,0,1,1.483,1.628v11.9a9.252,9.252,0,0,1-2.432,6.852q-2.432,2.409-6.963,2.409T2.4,20.452Q0,18.094,0,13.669V1.628A1.561,1.561,0,0,1,1.483,0h2.98A1.561,1.561,0,0,1,5.947,1.628V13.191a5.635,5.635,0,0,0,.85,3.451,3.153,3.153,0,0,0,2.632,1.094,3.032,3.032,0,0,0,2.582-1.076,5.836,5.836,0,0,0,.816-3.486Z" fill="#000"/>
+                      <path d="M75.207,20.857a1.561,1.561,0,0,1-1.483,1.628h-2.98a1.561,1.561,0,0,1-1.483-1.628V1.628A1.561,1.561,0,0,1,70.743,0h2.98a1.561,1.561,0,0,1,1.483,1.628Z" transform="translate(-45.91 0)" fill="#000"/>
+                      <path d="M0,80.018A1.561,1.561,0,0,1,1.483,78.39h26.7a1.561,1.561,0,0,1,1.483,1.628v2.006a1.561,1.561,0,0,1-1.483,1.628H1.483A1.561,1.561,0,0,1,0,82.025Z" transform="translate(0 -51.963)" fill="#000"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Restored buttons below the Glass Card -->
+            <a
+              class="rainbow-btn"
+              href="https://github.com/tanmay-stack07"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Star on GitHub"
+            >
+              <span class="left" style="display:inline-flex;align-items:center;gap:6px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.79 8.21 11.38.6.11.82-.26.82-.58 0-.29-.01-1.06-.02-2.07-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.74.08-.73.08-.73 1.2.09 1.83 1.23 1.83 1.23 1.07 1.83 2.81 1.3 3.5.99.11-.78.42-1.3.77-1.6-2.66-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.23-3.22-.12-.3-.53-1.52.12-3.16 0 0 1-.32 3.3 1.23A11.5 11.5 0 0 1 12 5.8c1.02.01 2.06.14 3.03.42 2.3-1.55 3.3-1.23 3.3-1.23.65 1.64.24 2.86.12 3.16.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.63-5.49 5.93.43.37.82 1.09.82 2.2 0 1.59-.02 2.87-.02 3.26 0 .32.22.69.82.57C20.56 21.78 24 17.29 24 12 24 5.37 18.63 0 12 0Z"/>
+                </svg>
+                <span>Star on GitHub</span>
+              </span>
+              <span class="right">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                  <path fill-rule="evenodd" clip-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z"/>
+                </svg>
+                <span style="letter-spacing:0.02em;">1.2k</span>
+              </span>
+            </a>
+            <a
+              class="liquid-btn"
+              href="https://www.linkedin.com/in/your-profile"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Connect with me on LinkedIn"
+            >
+              <span class="liquid-shadow"></span>
+              <span class="liquid-backdrop"></span>
+              <span class="liquid-content">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                  <path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S0 4.88 0 3.5 1.12 1 2.5 1 4.98 2.12 4.98 3.5zM0 8.98h5V24H0V8.98zM8.48 8.98h4.79v2.06h.07c.67-1.27 2.3-2.6 4.73-2.6 5.05 0 5.98 3.32 5.98 7.64V24h-5v-6.74c0-1.61-.03-3.68-2.24-3.68-2.24 0-2.58 1.75-2.58 3.56V24h-5V8.98z"/>
+                </svg>
+                <span>Connect</span>
+              </span>
+            </a>
+            <a
+              class="liquid-btn"
+              href="https://x.com/TanmayPati10282"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow on X (Twitter)"
+            >
+              <span class="liquid-shadow"></span>
+              <span class="liquid-backdrop"></span>
+              <span class="liquid-content">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+                  <path d="M18.244 2H21l-6.52 7.457L22.5 22h-6.29l-4.92-6.4L5.62 22H3l7.02-8.04L1.5 2h6.41l4.45 5.86L18.244 2Zm-2.21 18h1.62L7.97 4H6.26l9.774 16Z"/>
+                </svg>
+                <span>Follow on X</span>
+              </span>
+            </a>
+          </div>
+        </div>
+      </main>
+    </div>
+    <!-- Hidden SVG filter used by the Liquid Glass button -->
+    <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="container-glass" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.05 0.05" numOctaves="1" seed="1" result="turbulence" />
+          <feGaussianBlur in="turbulence" stdDeviation="2" result="blurredNoise" />
+          <feDisplacementMap in="SourceGraphic" in2="blurredNoise" scale="70" xChannelSelector="R" yChannelSelector="B" result="displaced" />
+          <feGaussianBlur in="displaced" stdDeviation="4" result="finalBlur" />
+          <feComposite in="finalBlur" in2="finalBlur" operator="over" />
+        </filter>
+      </defs>
+    </svg>
+
+    <script>
+      // Adapted to vanilla JS from a React/TS example
+      (function() {
+        const canvas = document.getElementById('particleCanvas');
+        /** @type {CanvasRenderingContext2D} */
+        const ctx = canvas.getContext('2d');
+
+        // Responsive sizing (maintain aspect ratio 1000x500)
+        function fitCanvas() {
+          const maxW = Math.min(document.body.clientWidth - 32, 1100);
+          const ratio = 1000 / 500;
+          const w = Math.max(600, maxW);
+          const h = Math.round(w / ratio);
+          canvas.style.width = w + 'px';
+          canvas.style.height = 'auto';
+          // Keep internal resolution fixed for crisp sampling
+          canvas.width = 1000;
+          canvas.height = 500;
+        }
+        fitCanvas();
+        window.addEventListener('resize', fitCanvas);
+
+        // Words to render
+        const words = [
+          'Tanmay Patil • AI Enthusiast',
+          'NETHOOKS',
+          'CREATOR',
+          'WELCOME',
+          'READ • LEARN • BUILD'
+        ];
+
+        // Mouse state
+        const mouse = { x: 0, y: 0, isPressed: false, isRightClick: false };
+
+        // Particle system
+        const pixelSteps = 6; // sampling density
+        const drawAsPoints = true; // small points vs circles
+        const particles = [];
+
+        function rand(min, max) { return Math.random() * (max - min) + min; }
+
+        class Particle {
+          constructor() {
+            this.pos = { x: 0, y: 0 };
+            this.vel = { x: 0, y: 0 };
+            this.acc = { x: 0, y: 0 };
+            this.target = { x: 0, y: 0 };
+
+            this.closeEnoughTarget = 100;
+            this.maxSpeed = 1.0;
+            this.maxForce = 0.1;
+            this.particleSize = 10;
+            this.isKilled = false;
+
+            this.startColor = { r: 0, g: 0, b: 0 };
+            this.targetColor = { r: 255, g: 255, b: 255 };
+            this.colorWeight = 0;
+            this.colorBlendRate = 0.01;
+          }
+
+          move() {
+            let proximityMult = 1;
+            const dx = this.pos.x - this.target.x;
+            const dy = this.pos.y - this.target.y;
+            const distance = Math.sqrt(dx*dx + dy*dy);
+            if (distance < this.closeEnoughTarget) {
+              proximityMult = distance / this.closeEnoughTarget;
+            }
+
+            // Desired velocity towards target
+            let tx = this.target.x - this.pos.x;
+            let ty = this.target.y - this.pos.y;
+            const mag = Math.sqrt(tx*tx + ty*ty);
+            if (mag > 0) {
+              tx = (tx / mag) * this.maxSpeed * proximityMult;
+              ty = (ty / mag) * this.maxSpeed * proximityMult;
+            }
+            // Steering = desired - velocity
+            let sx = tx - this.vel.x;
+            let sy = ty - this.vel.y;
+            const sm = Math.sqrt(sx*sx + sy*sy);
+            if (sm > 0) {
+              sx = (sx / sm) * this.maxForce;
+              sy = (sy / sm) * this.maxForce;
+            }
+
+            this.acc.x += sx;
+            this.acc.y += sy;
+
+            this.vel.x += this.acc.x;
+            this.vel.y += this.acc.y;
+            this.pos.x += this.vel.x;
+            this.pos.y += this.vel.y;
+            this.acc.x = 0;
+            this.acc.y = 0;
+          }
+
+          draw(ctx, asPoints) {
+            // Blend color
+            if (this.colorWeight < 1) {
+              this.colorWeight = Math.min(this.colorWeight + this.colorBlendRate, 1);
+            }
+            const r = Math.round(this.startColor.r + (this.targetColor.r - this.startColor.r) * this.colorWeight);
+            const g = Math.round(this.startColor.g + (this.targetColor.g - this.startColor.g) * this.colorWeight);
+            const b = Math.round(this.startColor.b + (this.targetColor.b - this.startColor.b) * this.colorWeight);
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+
+            if (asPoints) {
+              ctx.fillRect(this.pos.x, this.pos.y, 2, 2);
+            } else {
+              ctx.beginPath();
+              ctx.arc(this.pos.x, this.pos.y, this.particleSize / 2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          kill(width, height) {
+            if (this.isKilled) return;
+            const rp = generateRandomPos(width/2, height/2, (width + height) / 2);
+            this.target.x = rp.x;
+            this.target.y = rp.y;
+            // freeze current color as new start, then go to black
+            this.startColor = {
+              r: this.startColor.r + (this.targetColor.r - this.startColor.r) * this.colorWeight,
+              g: this.startColor.g + (this.targetColor.g - this.startColor.g) * this.colorWeight,
+              b: this.startColor.b + (this.targetColor.b - this.startColor.b) * this.colorWeight,
+            };
+            this.targetColor = { r: 0, g: 0, b: 0 };
+            this.colorWeight = 0;
+            this.isKilled = true;
+          }
+        }
+
+        function generateRandomPos(x, y, mag) {
+          const randomX = Math.random() * 1000;
+          const randomY = Math.random() * 500;
+          let dx = randomX - x;
+          let dy = randomY - y;
+          const m = Math.sqrt(dx*dx + dy*dy) || 1;
+          dx = (dx / m) * mag;
+          dy = (dy / m) * mag;
+          return { x: x + dx, y: y + dy };
+        }
+
+        function nextWord(word) {
+          // Render text to offscreen canvas
+          const off = document.createElement('canvas');
+          off.width = canvas.width; off.height = canvas.height;
+          const octx = off.getContext('2d');
+          octx.fillStyle = 'white';
+          octx.textAlign = 'center';
+          octx.textBaseline = 'middle';
+          // Scale font size based on word length
+          const base = 120;
+          const size = Math.max(40, Math.min(base, Math.floor(900 / Math.max(1, String(word).length) * 2.2)));
+          octx.font = `bold ${size}px Arial, sans-serif`;
+          octx.clearRect(0, 0, off.width, off.height);
+          octx.fillText(word, off.width/2, off.height/2);
+
+          const img = octx.getImageData(0, 0, off.width, off.height);
+          const pixels = img.data;
+
+          // New color for this word
+          const newColor = { r: Math.floor(rand(80,255)), g: Math.floor(rand(80,255)), b: Math.floor(rand(80,255)) };
+
+          let pIndex = 0;
+          const coords = [];
+          for (let i = 0; i < pixels.length; i += pixelSteps * 4) coords.push(i);
+          // Shuffle for fluid motion
+          for (let i = coords.length - 1; i > 0; i--) {
+            const j = (Math.random() * (i + 1)) | 0;
+            const tmp = coords[i]; coords[i] = coords[j]; coords[j] = tmp;
+          }
+
+          for (const coordIndex of coords) {
+            const alpha = pixels[coordIndex + 3];
+            if (alpha > 0) {
+              const px = (coordIndex / 4) % canvas.width;
+              const py = Math.floor(coordIndex / 4 / canvas.width);
+
+              let particle;
+              if (pIndex < particles.length) {
+                particle = particles[pIndex];
+                particle.isKilled = false;
+                pIndex++;
+              } else {
+                particle = new Particle();
+                const rp = generateRandomPos(canvas.width/2, canvas.height/2, (canvas.width + canvas.height)/2);
+                particle.pos.x = rp.x; particle.pos.y = rp.y;
+                particle.maxSpeed = rand(4, 10);
+                particle.maxForce = particle.maxSpeed * 0.05;
+                particle.particleSize = rand(6, 12);
+                particle.colorBlendRate = rand(0.0025, 0.03);
+                particles.push(particle);
+              }
+
+              // Color transition
+              particle.startColor = {
+                r: particle.startColor.r + (particle.targetColor.r - particle.startColor.r) * particle.colorWeight,
+                g: particle.startColor.g + (particle.targetColor.g - particle.startColor.g) * particle.colorWeight,
+                b: particle.startColor.b + (particle.targetColor.b - particle.startColor.b) * particle.colorWeight,
+              };
+              particle.targetColor = newColor;
+              particle.colorWeight = 0;
+
+              particle.target.x = px;
+              particle.target.y = py;
+            }
+          }
+
+          // Kill remaining particles not used for current word
+          for (let i = pIndex; i < particles.length; i++) {
+            particles[i].kill(canvas.width, canvas.height);
+          }
+        }
+
+        let frame = 0;
+        let wIndex = 0;
+        function animate() {
+          // Background with slight motion blur trail
+          ctx.fillStyle = 'rgba(0,0,0,0.1)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.move();
+            p.draw(ctx, drawAsPoints);
+            if (p.isKilled) {
+              if (p.pos.x < 0 || p.pos.x > canvas.width || p.pos.y < 0 || p.pos.y > canvas.height) {
+                particles.splice(i, 1);
+              }
+            }
+          }
+
+          // Mouse interaction: right button held kills nearby particles
+          if (mouse.isPressed && mouse.isRightClick) {
+            for (const p of particles) {
+              const dx = p.pos.x - mouse.x;
+              const dy = p.pos.y - mouse.y;
+              if (dx*dx + dy*dy < 50*50) p.kill(canvas.width, canvas.height);
+            }
+          }
+
+          // Advance word every ~4s at 60fps
+          frame++;
+          if (frame % 240 === 0) {
+            wIndex = (wIndex + 1) % words.length;
+            nextWord(words[wIndex]);
+          }
+
+          requestAnimationFrame(animate);
+        }
+
+        // Initialize
+        nextWord(words[0]);
+        animate();
+
+        // Mouse events on canvas
+        function updateMousePos(e) {
+          const rect = canvas.getBoundingClientRect();
+          mouse.x = e.clientX - rect.left;
+          mouse.y = e.clientY - rect.top;
+        }
+        canvas.addEventListener('mousedown', (e) => {
+          mouse.isPressed = true;
+          mouse.isRightClick = (e.button === 2);
+          updateMousePos(e);
+        });
+        canvas.addEventListener('mouseup', () => {
+          mouse.isPressed = false;
+          mouse.isRightClick = false;
+        });
+        canvas.addEventListener('mousemove', updateMousePos);
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+      })();
+    </script>
+  </body>
+  </html>
+
