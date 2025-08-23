@@ -309,6 +309,11 @@ def creator():
     """Public page showing the site's creator info."""
     return render_template('creator.html')
 
+@app.route('/favicon.ico')
+def favicon():
+    """Serve favicon from the static directory to satisfy /favicon.ico requests."""
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 @app.route('/profiles')
 @login_required
 def get_profiles():
