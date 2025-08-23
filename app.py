@@ -294,7 +294,7 @@ def profiles_page():
 @login_required
 def profile_card():
     # Serve the built React app (Vite) from profile-card-app/dist
-    dist_dir = os.path.join(app.root_path, 'profile-card-app', 'dist')
+    dist_dir = os.path.join(app.root_path, 'static', 'profile-card-app')
     index_path = os.path.join(dist_dir, 'index.html')
     if not os.path.exists(index_path):
         # Provide a friendly message if not built yet
@@ -306,7 +306,7 @@ def profile_card():
 @login_required
 def profile_card_assets(filename):
     # Serve static assets for the React app under /profile_card/
-    dist_dir = os.path.join(app.root_path, 'profile-card-app', 'dist')
+    dist_dir = os.path.join(app.root_path, 'static', 'profile-card-app')
     return send_from_directory(dist_dir, filename)
 
 @app.route('/home')
