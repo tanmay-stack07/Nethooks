@@ -34,6 +34,10 @@ logger.debug("Flask app initialized")
 # --- Caching Configuration ---
 app.config['CACHE_TYPE'] = 'filesystem'
 app.config['CACHE_DIR'] = 'cache'
+try:
+    os.makedirs(app.config['CACHE_DIR'], exist_ok=True)
+except Exception as e:
+    logger.warning("Could not create cache dir '%s': %s", app.config['CACHE_DIR'], e)
 cache = Cache(app)
 logger.debug("Cache configured")
 
@@ -304,8 +308,8 @@ def build_books_query(raw_query: str):
 # --- Routes ---
 @app.route('/')
 def index():
-    # Serve the new hero UI as the main homepage
-    return render_template('home_page.html')
+    # Serve the intro/landing page (video)
+    return render_template('index.html')
 
 @app.route('/profiles_page')
 @login_required
@@ -333,8 +337,8 @@ def profile_card_assets(filename):
 
 @app.route('/home')
 def home():
-    # Canonicalize to root
-    return redirect(url_for('index'))
+    # Serve the main homepage directly
+    return render_template('home_page.html')
 
 @app.route('/creator')
 def creator():
@@ -614,7 +618,7 @@ def login():
                     create_default_shelves(user.id)
                 except Exception:
                     pass
-                return redirect(url_for('profiles_page'))
+                return redirect(url_for('home'))
 
     # GET or fallthrough renders the email login form
     return render_template('login_email.html')

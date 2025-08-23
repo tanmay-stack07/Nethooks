@@ -29,8 +29,9 @@ function hasPreviewAvailable(book) {
 // Helper: determine if a book should be treated as unavailable for online preview
 function isUnavailable(book) {
   try {
-    // Unavailable only when there is no usable preview and it isn't a free book.
-    return !hasPreviewAvailable(book) && !book.is_free;
+    // Unavailable only when there is no usable preview, not free, and not for sale with a buy link.
+    const isForSale = book && book.saleability === 'FOR_SALE' && !!book.buy_link;
+    return !hasPreviewAvailable(book) && !book.is_free && !isForSale;
   } catch (_) {
     return false;
   }
@@ -179,7 +180,12 @@ async function loadBooksBySection(sectionName, elementId) {
   try {
     const limit = 12; // keep carousels lightweight
     const response = await fetch(`/api/books/section/${sectionName}?limit=${limit}&_=${Date.now()}`);
-    const books = await response.json();
+    let books = await response.json();
+
+    // Philosophy section: only include books with an actual online preview
+    if (sectionName === 'philosophy' && Array.isArray(books)) {
+      books = books.filter(b => hasPreviewAvailable(b));
+    }
 
     carousel.innerHTML = '';
     if (!Array.isArray(books) || books.length === 0) {
@@ -188,8 +194,8 @@ async function loadBooksBySection(sectionName, elementId) {
       return;
     }
     
-    // Filter out unavailable books (no online preview)
-    const usable = books.filter(b => !isUnavailable(b));
+    // Show all books; modal logic will ensure Preview only appears when available
+    const usable = books;
     if (!usable.length) {
       if (section) section.style.display = 'none';
       else carousel.innerHTML = '<div class="no-books">No available books in this section.</div>';
@@ -197,9 +203,10 @@ async function loadBooksBySection(sectionName, elementId) {
     }
     usable.forEach(book => {
       const bookElement = createBookItem(book);
-      if (isUnavailable(book)) {
-        bookElement.setAttribute('aria-disabled', 'true');
-      }
+      // Tag with section for downstream handlers/modal behavior
+      try { bookElement.dataset.sectionName = sectionName; } catch (_) {}
+      // Visually indicate unavailability but still allow opening the modal
+      if (isUnavailable(book)) bookElement.setAttribute('aria-disabled', 'true');
       carousel.appendChild(bookElement);
     });
     // Drag-to-scroll is enabled globally in DOMContentLoaded via enableDragScroll
@@ -212,7 +219,7 @@ async function loadBooksBySection(sectionName, elementId) {
 }
 
 // Function to show book preview
-function showBookPreview(book) {
+function showBookPreview(book, sectionName = '') {
   const modal = document.getElementById('preview-modal');
   const title = document.getElementById('preview-title');
   const cover = document.getElementById('preview-cover');
@@ -244,13 +251,17 @@ function showBookPreview(book) {
   const goodreadsUrl = `https://www.goodreads.com/search?q=${encodeURIComponent(book.title || '')}+${encodeURIComponent(book.author || '')}`;
   const infoUrl = normalizeUrl(book.info_link || '#');
   let previewUrl = normalizeUrl(book.preview_link || infoUrl);
-  const buyUrl = book.buy_link && book.buy_link !== '#' ? normalizeUrl(book.buy_link) : null;
+  // Ensure we always have a usable buy link when the book is for sale
+  let buyUrl = book.buy_link && book.buy_link !== '#' ? normalizeUrl(book.buy_link) : null;
+  if (!buyUrl && book.saleability === 'FOR_SALE' && infoUrl && infoUrl !== '#') {
+    buyUrl = infoUrl;
+  }
   const isManga = Array.isArray(book.categories) && book.categories.some(c => /manga/i.test(c));
   const unavailable = isUnavailable(book);
   
   // Enhanced preview availability check
-  const hasPreview = book.viewability && book.viewability !== 'NO_PAGES';
-  const previewText = book.is_free ? 'Read Free' : (hasPreview ? 'Preview' : 'Info');
+  const hasPreview = !!hasPreviewAvailable(book);
+  const previewText = book.is_free ? 'Read Free' : (hasPreview ? 'Preview' : (buyUrl ? 'Buy' : 'Info'));
 
   // Tachiyomi-friendly fallback: if manga and no preview/buy, suggest MangaDex search
   let tachiyomiUrl = '';
@@ -276,55 +287,62 @@ function showBookPreview(book) {
     communitySection.style.display = 'none';
   }
 
-  // Update Play button label based on availability (disable/remove Preview globally)
+  // Update Play button label and state based on availability
   try {
-    if (book.saleability === 'FOR_SALE' && buyUrl) {
-      // Show active Buy button
-      playBtn.style.display = '';
+    playBtn.style.display = '';
+    playBtn.removeAttribute('aria-disabled');
+    playBtn.disabled = false;
+    if (book.is_free) {
+      playBtn.textContent = 'Read Free';
+      playBtn.title = 'Open the free preview';
+      playBtn.classList.add('btn-free');
+    } else if (hasPreview) {
+      playBtn.textContent = 'Preview';
+      playBtn.title = 'Open preview on Google Books';
+      playBtn.classList.remove('btn-free');
+    } else if (book.saleability === 'FOR_SALE' && buyUrl) {
       playBtn.textContent = 'Buy';
       playBtn.title = 'Purchase from store';
       playBtn.classList.remove('btn-free');
-      playBtn.removeAttribute('aria-disabled');
-      playBtn.disabled = false;
+    } else if (infoUrl && infoUrl !== '#') {
+      playBtn.textContent = 'Info';
+      playBtn.title = 'Open information page';
+      playBtn.classList.remove('btn-free');
     } else {
-      // For any case that would have shown Preview/Read, remove the button
-      playBtn.style.display = 'none';
+      // Truly no action available
+      playBtn.textContent = 'Unavailable';
+      playBtn.title = 'No preview or info available';
       playBtn.setAttribute('aria-disabled', 'true');
       playBtn.disabled = true;
     }
   } catch (_) {}
 
-  // Wire action buttons (preview-first logic, no local PDF usage)
+  // Wire action buttons (prefer preview/read, then buy, then info)
   playBtn.onclick = (e) => {
     e.preventDefault();
-    if (isUnavailable(book)) {
-      showToast('This book is not available to preview online.', 'warn');
-      return;
-    }
+    const previewUrl = normalizeUrl(book.preview_link || '');
+    const infoUrlN = normalizeUrl(book.info_link || '');
+    const buyUrlN = book.buy_link && book.buy_link !== '#' ? normalizeUrl(book.buy_link) : '';
 
-    const previewUrl = normalizeUrl(book.preview_link);
-    const infoUrl = normalizeUrl(book.info_link);
-    const buyUrl = book.buy_link && book.buy_link !== '#' ? normalizeUrl(book.buy_link) : null;
-    const hasPreview = book.viewability && book.viewability !== 'NO_PAGES';
-
-    // Disable Preview open: no preview action even if available
     if (book.is_free || hasPreview) {
-      showToast('Preview disabled. Use Buy or Info options.', 'warn');
-      return;
-    }
-
-    // Paid flow: open store/buy link when available
-    if (book.saleability === 'FOR_SALE' && buyUrl) {
-      const w = window.open(buyUrl, '_blank');
+      const w = window.open(previewUrl || infoUrlN, '_blank');
       if (!w) showToast('Popup blocked. Please allow popups for this site.', 'error');
       return;
     }
 
-    // Fallback: open info link (but do not open Google Reader)
-    if (infoUrl && infoUrl !== '#') {
-      const w = window.open(infoUrl, '_blank');
+    if (book.saleability === 'FOR_SALE' && buyUrlN) {
+      const w = window.open(buyUrlN, '_blank');
       if (!w) showToast('Popup blocked. Please allow popups for this site.', 'error');
+      return;
     }
+
+    if (infoUrlN && infoUrlN !== '#') {
+      const w = window.open(infoUrlN, '_blank');
+      if (!w) showToast('Popup blocked. Please allow popups for this site.', 'error');
+      return;
+    }
+
+    showToast('No online preview or info available for this title.', 'warn');
   };
   addBtn.onclick = (e) => {
     e.preventDefault();
@@ -393,11 +411,8 @@ function showBookPreview(book) {
           }
           el.addEventListener('click', (e) => {
             e.preventDefault();
-            if (isUnavailable(rb)) {
-              showToast('This book is not available to preview online.', 'warn');
-              return;
-            }
-            showBookPreview(rb);
+            // Always open modal; propagate current section context
+            showBookPreview(rb, sectionName);
           });
           relatedBooks.appendChild(el);
         });
@@ -465,7 +480,7 @@ function createSearchResultItem(book) {
   // Attach full book data to the search result element
   item.bookData = book;
 
-  // Mark and block unavailable books from opening
+  // Mark unavailable visually, but do not block opening the modal
   if (isUnavailable(book)) {
     item.setAttribute('aria-disabled', 'true');
     item.classList.add('unavailable');
@@ -473,10 +488,7 @@ function createSearchResultItem(book) {
 
   item.addEventListener('click', (e) => {
     e.preventDefault();
-    if (isUnavailable(book)) {
-      showToast('This book is not available to preview online.', 'warn');
-      return;
-    }
+    // Always open modal; the modal will disable the Preview button when needed
     showBookPreview(book);
   });
 
@@ -794,13 +806,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const bookItem = e.target.closest('.book-item, .search-result-item');
     if (bookItem && bookItem.bookData) {
       e.preventDefault();
-      // Always use the full bookData object attached to the element.
-      // This ensures 'preview_link' and 'pdf_link' are available.
-      if (isUnavailable(bookItem.bookData)) {
-        showToast('This book is not available to preview online.', 'warn');
-        return;
-      }
-      showBookPreview(bookItem.bookData);
+      // Open modal for all items; pass section name when available for section-specific behavior
+      const sectionName = bookItem.dataset ? (bookItem.dataset.sectionName || '') : '';
+      showBookPreview(bookItem.bookData, sectionName);
     }
   });
 

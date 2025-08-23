@@ -5,19 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Set Up Your Gravatar</title>
     <style>
-        body { background-color: #141414; color: #fff; font-family: Arial, sans-serif; text-align: center; padding-top: 100px; }
-        .container { max-width: 600px; margin: auto; padding: 20px; border: 1px solid #444; border-radius: 8px; }
+        body { background-color: #000; color: #fff; font-family: Arial, sans-serif; margin: 0; min-height: 100vh; }
+        /* Fullscreen background video */
+        #bg-video {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -1;
+            object-fit: cover;
+            filter: brightness(0.35) saturate(1.1);
+        }
+        /* Foreground content */
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 24px;
+            padding-top: 120px;
+            text-align: center;
+        }
+        .card {
+            background: rgba(20, 20, 20, 0.75);
+            backdrop-filter: blur(6px);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
         .gravatar-button { background-color: #007bff; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 1.2rem; cursor: pointer; text-decoration: none; display: block; margin: 20px auto; }
     </style>
 </head>
 <body>
+    <!-- Background video -->
+    <video id="bg-video" autoplay muted loop playsinline preload="auto" poster="{{ url_for('static', filename='images/throfinn.jpg') }}">
+        <source src="{{ url_for('static', filename='videos/site_intro-2.mp4') }}" type="video/mp4">
+    </video>
+
     <div class="container">
-        <h1>Welcome!</h1>
-        <p>Your account has been created with the email: <strong>{{ user_email }}</strong>.</p>
-        <p>To get your personal avatar, please link your email with a Gravatar account.</p>
-        <p>This ensures you have a unique and consistent avatar across many sites.</p>
-        <a href="https://en.gravatar.com/gravatars/new/" class="gravatar-button" target="_blank">Go to Gravatar to Create Your Avatar</a>
-        <p>After you've set up your Gravatar, you can <a href="{{ url_for('profiles_page') }}" style="color: #fff;">return to the profiles page</a>.</p>
+        <div class="card">
+            <h1>Welcome!</h1>
+            <p>Your account has been created with the email: <strong>{{ user_email }}</strong>.</p>
+            <p>To get your personal avatar, please link your email with a Gravatar account.</p>
+            <p>This ensures you have a unique and consistent avatar across many sites.</p>
+            <a href="https://en.gravatar.com/gravatars/new/" class="gravatar-button" target="_blank">Go to Gravatar to Create Your Avatar</a>
+            <p>After you've set up your Gravatar, you can <a href="{{ url_for('profiles_page') }}" style="color: #fff;">return to the profiles page</a>.</p>
+        </div>
     </div>
 </body>
 </html>
