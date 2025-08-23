@@ -42,3 +42,8 @@ node_modules/
 # Misc
 *.sqlite3
 *.db
+
+# Allow static/videos in repo
+!static/videos/
+!static/videos/**
+!static/favicon.ico
