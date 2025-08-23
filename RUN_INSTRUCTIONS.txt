@@ -1,0 +1,87 @@
+Nethooks - Run Instructions (Windows, macOS/Linux)
+=================================================
+
+Prerequisites
+- Python 3.10+ installed
+- MySQL server reachable with a database and user
+- This folder contains: app.py, requirements.txt, scripts/, migrations/, templates/, static/, Procfile, runtime.txt
+- Create your own .env (do NOT commit/share secrets)
+
+----------------------------------------
+Windows (PowerShell)
+----------------------------------------
+1) Create and activate a virtual environment
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+
+2) Install dependencies
+   python -m pip install -r requirements.txt
+
+3) Create .env (copy from .env.example) and set values:
+   SECRET_KEY=change-me
+   FLASK_DEBUG=1
+   USE_SSL=0
+   MYSQL_HOST=127.0.0.1
+   MYSQL_PORT=3306
+   MYSQL_USER=root
+   MYSQL_PASSWORD=yourpassword
+   MYSQL_DB=your_db_name
+   # Optional
+   GOOGLE_BOOKS_API_KEY=
+
+4) Verify DB connectivity
+   python scripts/db_check.py
+
+5) Apply migrations (creates tables)
+   python scripts/migrate.py
+
+6) Run the app locally
+   $env:FLASK_APP="app.py"; python -m flask run --host 0.0.0.0 --port 5000
+   Open http://localhost:5000
+   Health checks: /health, /api/test
+
+----------------------------------------
+macOS / Linux (bash/zsh)
+----------------------------------------
+1) Create and activate a virtual environment
+   python3 -m venv .venv
+   source .venv/bin/activate
+
+2) Install dependencies
+   python -m pip install -r requirements.txt
+
+3) Create .env (copy from .env.example) and set values (same as Windows)
+
+4) Verify DB connectivity
+   python scripts/db_check.py
+
+5) Apply migrations
+   python scripts/migrate.py
+
+6) Run the app locally
+   FLASK_APP=app.py python -m flask run --host 0.0.0.0 --port 5000
+   Open http://localhost:5000
+
+----------------------------------------
+Production-style run (optional)
+----------------------------------------
+- Using Gunicorn (recommended on Linux/WSL):
+  gunicorn app:app --bind 0.0.0.0:5000 --workers 3 --timeout 120
+
+----------------------------------------
+Deploying to Code Capsules (summary)
+----------------------------------------
+- Ensure Procfile exists at repo root:
+  web: gunicorn app:app --bind 0.0.0.0:$PORT --workers 3 --timeout 120
+- Set environment variables on the Capsule:
+  SECRET_KEY, MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB, GOOGLE_BOOKS_API_KEY (optional), USE_SSL
+- Start capsule and watch Logs. Verify endpoints:
+  /health, /api/test, / (homepage), /login
+
+----------------------------------------
+Troubleshooting
+----------------------------------------
+- ImportError / ModuleNotFoundError: Ensure venv is activated and dependencies installed
+- DB errors: Check .env values and DB reachability; re-run scripts/db_check.py
+- "Page not found" after deploy: Confirm Procfile, check logs, ensure app listening via gunicorn
+- Large media: Avoid committing huge files; see .gitignore

@@ -11,7 +11,7 @@ import time
 from flask import Flask, render_template, redirect, url_for, session, request, jsonify, send_from_directory, flash
 from flask_caching import Cache
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user, login_required
-import mysql.connector
+from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 logger.debug("Imports loaded")
 
@@ -22,9 +22,7 @@ logger.debug(".env file loaded")
 if logger.isEnabledFor(logging.DEBUG):
     logger.debug("Loading environment variables")
     logger.debug("SECRET_KEY: %s", 'Loaded' if os.getenv('SECRET_KEY') else 'Not Loaded')
-    logger.debug("MYSQL_HOST: %s", os.getenv('MYSQL_HOST'))
-    logger.debug("MYSQL_USER: %s", os.getenv('MYSQL_USER'))
-    logger.debug("MYSQL_DB: %s", os.getenv('MYSQL_DB'))
+    logger.debug("DATABASE_URL present: %s", bool(os.getenv('DATABASE_URL')))
     logger.debug("GOOGLE_BOOKS_API_KEY: %s", 'Loaded' if os.getenv('GOOGLE_BOOKS_API_KEY') else 'Not Loaded')
 
 # App initialization
@@ -44,15 +42,10 @@ logger.debug("Cache configured")
 # --- Configuration ---
 logger.debug("Configuring app from env")
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST')
-try:
-    app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT'))
-except (ValueError, TypeError):
-    logger.warning("MYSQL_PORT is not a valid integer or is not set. Defaulting to 3306.")
-    app.config['MYSQL_PORT'] = 3306
-app.config['MYSQL_USER'] = os.getenv('MYSQL_USER')
-app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD')
-app.config['MYSQL_DB'] = os.getenv('MYSQL_DB')
+DATABASE_URL = os.getenv('DATABASE_URL')
+if not DATABASE_URL:
+    logger.warning("DATABASE_URL is not set. Database operations will fail until it is configured.")
+engine = create_engine(DATABASE_URL, pool_pre_ping=True) if DATABASE_URL else None
 logger.debug("App configured from env")
 
 # Prefer https URLs when SSL is enabled
@@ -64,11 +57,9 @@ GOOGLE_BOOKS_API_KEY = os.getenv("GOOGLE_BOOKS_API_KEY")
 
 # --- Database Connection ---
 def get_db_connection():
-    return mysql.connector.connect(
-        host=app.config['MYSQL_HOST'], port=app.config['MYSQL_PORT'],
-        user=app.config['MYSQL_USER'], password=app.config['MYSQL_PASSWORD'],
-        database=app.config['MYSQL_DB']
-    )
+    if not engine:
+        raise RuntimeError("DATABASE_URL not configured")
+    return engine.connect()
 
 # --- User Model and Login Manager ---
 login_manager = LoginManager()
@@ -86,14 +77,11 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-        user_data = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        if user_data:
-            return User(id=user_data['id'], name=user_data['name'], email=user_data['email'], avatar=user_data['avatar'])
+        with get_db_connection() as conn:
+            res = conn.execute(text("SELECT id, name, email, avatar FROM users WHERE id = :id"), {"id": user_id})
+            row = res.mappings().fetchone()
+        if row:
+            return User(id=row['id'], name=row['name'], email=row['email'], avatar=row['avatar'])
     except Exception as e:
         # On DB failure, log and treat as not authenticated instead of 500
         logger.error("load_user DB error: %s", e)
@@ -196,56 +184,32 @@ def get_book_data(item):
 def create_default_shelves(user_id):
     """Ensure default shelves exist for a user: To Read, Currently Reading, Read"""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS shelves (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id VARCHAR(128) NOT NULL,
-                name VARCHAR(100) NOT NULL,
-                is_default TINYINT(1) NOT NULL DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY uniq_user_name (user_id, name)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS shelf_books (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                shelf_id INT NOT NULL,
-                book_id VARCHAR(64) NOT NULL,
-                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY uniq_shelf_book (shelf_id, book_id),
-                CONSTRAINT fk_shelf_books_shelf FOREIGN KEY (shelf_id) REFERENCES shelves(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """)
-
         defaults = ["To Read", "Currently Reading", "Read"]
         created = []
-        for name in defaults:
-            try:
-                cursor.execute("INSERT IGNORE INTO shelves (user_id, name, is_default) VALUES (%s, %s, 1)", (user_id, name))
-                if cursor.rowcount:
-                    created.append(name)
-            except Exception:
-                pass
-        conn.commit()
-        logger.debug("Default shelves created for %s: %s", user_id, created)
+        with get_db_connection() as conn:
+            for nm in defaults:
+                try:
+                    res = conn.execute(
+                        text("""
+                            INSERT INTO shelves (user_id, name, is_default)
+                            VALUES (:uid, :name, TRUE)
+                            ON CONFLICT (user_id, name) DO NOTHING
+                        """),
+                        {"uid": user_id, "name": nm}
+                    )
+                    if res.rowcount:
+                        created.append(nm)
+                except Exception:
+                    pass
+        logger.debug("Default shelves ensured for %s: %s", user_id, created)
     except Exception as e:
         logger.error("create_default_shelves error: %s", e)
-    finally:
-        try:
-            cursor.close(); conn.close()
-        except Exception:
-            pass
 
 def get_shelf_by_name(user_id, name):
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        cursor.execute("SELECT * FROM shelves WHERE user_id = %s AND name = %s", (user_id, name))
-        return cursor.fetchone()
-    finally:
-        cursor.close(); conn.close()
+    with get_db_connection() as conn:
+        res = conn.execute(text("SELECT id, user_id, name, is_default, created_at FROM shelves WHERE user_id = :uid AND name = :name"), {"uid": user_id, "name": name})
+        row = res.mappings().fetchone()
+        return dict(row) if row else None
 
 def fetch_book_by_id(volume_id):
     try:
@@ -349,12 +313,9 @@ def creator():
 @login_required
 def get_profiles():
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, name, avatar FROM users")
-        profiles = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        with get_db_connection() as conn:
+            res = conn.execute(text("SELECT id, name, avatar FROM users"))
+            profiles = [dict(r) for r in res.mappings().all()]
         logger.debug("Fetched profiles: %s", profiles)
         return jsonify(profiles)
     except Exception as e:
@@ -571,42 +532,44 @@ def login():
             name = email.split('@')[0]
             avatar_url = f"https://www.gravatar.com/avatar/{avatar_hash}?d=identicon&s=150"
 
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            try:
-                # Look up by email first to avoid unique email conflicts with legacy IDs
-                cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-                user_data = cursor.fetchone()
-                if not user_data:
-                    # Not found by email -> create new record with deterministic id
-                    cursor.execute(
-                        "INSERT INTO users (id, name, email, avatar) VALUES (%s, %s, %s, %s)",
-                        (user_id, name, email, avatar_url)
-                    )
-                    conn.commit()
-                    cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-                    user_data = cursor.fetchone()
-                    # New account path
-                    flash("New account created! Signing you in...", "success")
-                else:
-                    # Optionally refresh avatar/name if changed
-                    if (user_data.get('avatar') != avatar_url) or (user_data.get('name') != name):
-                        try:
-                            cursor.execute(
-                                "UPDATE users SET name = %s, avatar = %s WHERE id = %s",
-                                (name, avatar_url, user_data['id'])
-                            )
-                            conn.commit()
-                            cursor.execute("SELECT * FROM users WHERE id = %s", (user_data['id'],))
-                            user_data = cursor.fetchone()
-                        except Exception:
-                            # Non-fatal; proceed with existing data
-                            pass
-                    # Existing account path
-                    flash("Welcome back! Signing you in...", "success")
-            finally:
-                cursor.close()
-                conn.close()
+            with get_db_connection() as conn:
+                with conn.begin():
+                    # Look up by email first to avoid unique email conflicts with legacy IDs
+                    res = conn.execute(text("SELECT id, name, email, avatar FROM users WHERE email = :email"), {"email": email})
+                    row = res.mappings().fetchone()
+                    user_data = dict(row) if row else None
+                    if not user_data:
+                        # Not found by email -> create new record with deterministic id
+                        conn.execute(
+                            text("""
+                                INSERT INTO users (id, name, email, avatar)
+                                VALUES (:id, :name, :email, :avatar)
+                                ON CONFLICT (id) DO NOTHING
+                            """),
+                            {"id": user_id, "name": name, "email": email, "avatar": avatar_url}
+                        )
+                        # Fetch the created (or existing by unique email) record
+                        res2 = conn.execute(text("SELECT id, name, email, avatar FROM users WHERE email = :email"), {"email": email})
+                        row2 = res2.mappings().fetchone()
+                        user_data = dict(row2) if row2 else None
+                        # New account path
+                        flash("New account created! Signing you in...", "success")
+                    else:
+                        # Optionally refresh avatar/name if changed
+                        if (user_data.get('avatar') != avatar_url) or (user_data.get('name') != name):
+                            try:
+                                conn.execute(
+                                    text("UPDATE users SET name = :name, avatar = :avatar WHERE id = :id"),
+                                    {"name": name, "avatar": avatar_url, "id": user_data['id']}
+                                )
+                                res3 = conn.execute(text("SELECT id, name, email, avatar FROM users WHERE id = :id"), {"id": user_data['id']})
+                                row3 = res3.mappings().fetchone()
+                                user_data = dict(row3) if row3 else user_data
+                            except Exception:
+                                # Non-fatal; proceed with existing data
+                                pass
+                        # Existing account path
+                        flash("Welcome back! Signing you in...", "success")
 
             if user_data:
                 user = User(id=user_data['id'], name=user_data['name'], email=user_data['email'], avatar=user_data['avatar'])
@@ -643,20 +606,15 @@ def logout():
 def delete_profile(profile_id):
     self_deleted = (profile_id == current_user.id)
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("DELETE FROM users WHERE id = %s", (profile_id,))
-        conn.commit()
-        if self_deleted:
-            logout_user()
-        return jsonify({'success': True, 'self_deleted': self_deleted})
-    except mysql.connector.Error as e:
-        logger.error("Database error: %s", e)
-        return jsonify({'success': False, 'message': 'Database error'}), 500
-    finally:
-        cursor.close()
-        conn.close()
+    with get_db_connection() as conn:
+        try:
+            conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": profile_id})
+            if self_deleted:
+                logout_user()
+            return jsonify({'success': True, 'self_deleted': self_deleted})
+        except Exception as e:
+            logger.error("Database error: %s", e)
+            return jsonify({'success': False, 'message': 'Database error'}), 500
 
 @app.route('/pdfs/<filename>')
 @login_required
@@ -726,69 +684,73 @@ def api_ensure_defaults():
 @login_required
 def api_shelves():
     if request.method == 'GET':
-        conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
-        try:
-            cursor.execute("SELECT id, name, is_default FROM shelves WHERE user_id = %s ORDER BY is_default DESC, name", (current_user.id,))
-            return jsonify(cursor.fetchall())
-        finally:
-            cursor.close(); conn.close()
+        with get_db_connection() as conn:
+            res = conn.execute(text("""
+                SELECT id, name, is_default
+                FROM shelves
+                WHERE user_id = :uid
+                ORDER BY is_default DESC, name
+            """), {"uid": current_user.id})
+            return jsonify([dict(r) for r in res.mappings().all()])
     else:
         name = (request.json or {}).get('name', '').strip()
         if not name:
             return jsonify({'error': 'name required'}), 400
-        conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
-        try:
-            cursor.execute("INSERT INTO shelves (user_id, name, is_default) VALUES (%s, %s, 0)", (current_user.id, name))
-            conn.commit()
-            return jsonify({'id': cursor.lastrowid, 'name': name, 'is_default': 0}), 201
-        except mysql.connector.Error as e:
-            return jsonify({'error': str(e)}), 400
-        finally:
-            cursor.close(); conn.close()
+        with get_db_connection() as conn:
+            try:
+                res = conn.execute(text(
+                    """
+                    INSERT INTO shelves (user_id, name, is_default)
+                    VALUES (:uid, :name, FALSE)
+                    RETURNING id
+                    """
+                ), {"uid": current_user.id, "name": name})
+                new_id = res.scalar()
+                return jsonify({'id': new_id, 'name': name, 'is_default': False}), 201
+            except Exception as e:
+                return jsonify({'error': str(e)}), 400
 
 @app.route('/api/shelves/<int:shelf_id>', methods=['PATCH', 'DELETE'])
 @login_required
 def api_shelf_modify(shelf_id):
-    conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
-    try:
-        cursor.execute("SELECT * FROM shelves WHERE id = %s AND user_id = %s", (shelf_id, current_user.id))
-        shelf = cursor.fetchone()
+    with get_db_connection() as conn:
+        res = conn.execute(text("SELECT id, user_id, name, is_default FROM shelves WHERE id = :id AND user_id = :uid"), {"id": shelf_id, "uid": current_user.id})
+        shelf = res.mappings().fetchone()
         if not shelf:
             return jsonify({'error': 'not found'}), 404
         if request.method == 'PATCH':
-            if shelf.get('is_default'):
+            if shelf.get('is_default') if isinstance(shelf, dict) else shelf['is_default']:
                 return jsonify({'error': 'cannot rename default shelf'}), 400
             name = (request.json or {}).get('name', '').strip()
             if not name:
                 return jsonify({'error': 'name required'}), 400
-            cursor.execute("UPDATE shelves SET name = %s WHERE id = %s", (name, shelf_id))
-            conn.commit()
+            conn.execute(text("UPDATE shelves SET name = :name WHERE id = :id"), {"name": name, "id": shelf_id})
             return jsonify({'ok': True})
         else:
-            if shelf.get('is_default'):
+            if shelf.get('is_default') if isinstance(shelf, dict) else shelf['is_default']:
                 return jsonify({'error': 'cannot delete default shelf'}), 400
-            cursor.execute("DELETE FROM shelves WHERE id = %s", (shelf_id,))
-            conn.commit()
+            conn.execute(text("DELETE FROM shelves WHERE id = :id"), {"id": shelf_id})
             return jsonify({'ok': True})
-    finally:
-        cursor.close(); conn.close()
 
 @app.route('/api/shelves/<int:shelf_id>/books', methods=['GET', 'POST'])
 @login_required
 def api_shelf_books(shelf_id):
-    conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
-    try:
+    with get_db_connection() as conn:
         # Ownership check
-        cursor.execute("SELECT * FROM shelves WHERE id = %s AND user_id = %s", (shelf_id, current_user.id))
-        shelf = cursor.fetchone()
+        res = conn.execute(text("SELECT id FROM shelves WHERE id = :id AND user_id = :uid"), {"id": shelf_id, "uid": current_user.id})
+        shelf = res.fetchone()
         if not shelf:
             return jsonify({'error': 'not found'}), 404
 
         if request.method == 'GET':
             limit = int(request.args.get('limit', 40))
-            cursor.execute("SELECT book_id FROM shelf_books WHERE shelf_id = %s ORDER BY added_at DESC LIMIT %s", (shelf_id, limit))
-            ids = [row['book_id'] for row in cursor.fetchall()]
-            # Fetch details for each id (simple N calls; could be optimized)
+            res2 = conn.execute(text("""
+                SELECT book_id FROM shelf_books
+                WHERE shelf_id = :sid
+                ORDER BY added_at DESC
+                LIMIT :lim
+            """), {"sid": shelf_id, "lim": limit})
+            ids = [row[0] for row in res2.fetchall()]
             books = []
             for vid in ids:
                 b = fetch_book_by_id(vid)
@@ -800,28 +762,27 @@ def api_shelf_books(shelf_id):
             if not book_id:
                 return jsonify({'error': 'book_id required'}), 400
             try:
-                cursor.execute("INSERT IGNORE INTO shelf_books (shelf_id, book_id) VALUES (%s, %s)", (shelf_id, book_id))
-                conn.commit()
-                return jsonify({'ok': True, 'added': cursor.rowcount > 0})
-            except mysql.connector.Error as e:
+                res3 = conn.execute(text(
+                    """
+                    INSERT INTO shelf_books (shelf_id, book_id)
+                    VALUES (:sid, :bid)
+                    ON CONFLICT (shelf_id, book_id) DO NOTHING
+                    """
+                ), {"sid": shelf_id, "bid": book_id})
+                return jsonify({'ok': True, 'added': res3.rowcount > 0})
+            except Exception as e:
                 return jsonify({'error': str(e)}), 400
-    finally:
-        cursor.close(); conn.close()
 
 @app.route('/api/shelves/<int:shelf_id>/books/<book_id>', methods=['DELETE'])
 @login_required
 def api_shelf_book_delete(shelf_id, book_id):
-    conn = get_db_connection(); cursor = conn.cursor()
-    try:
+    with get_db_connection() as conn:
         # Ownership check
-        cursor.execute("SELECT 1 FROM shelves WHERE id = %s AND user_id = %s", (shelf_id, current_user.id))
-        if not cursor.fetchone():
+        res = conn.execute(text("SELECT 1 FROM shelves WHERE id = :id AND user_id = :uid"), {"id": shelf_id, "uid": current_user.id})
+        if not res.fetchone():
             return jsonify({'error': 'not found'}), 404
-        cursor.execute("DELETE FROM shelf_books WHERE shelf_id = %s AND book_id = %s", (shelf_id, book_id))
-        conn.commit()
+        conn.execute(text("DELETE FROM shelf_books WHERE shelf_id = :sid AND book_id = :bid"), {"sid": shelf_id, "bid": book_id})
         return jsonify({'ok': True})
-    finally:
-        cursor.close(); conn.close()
 
 @app.route('/api/mylist/add', methods=['POST'])
 @login_required
@@ -835,14 +796,16 @@ def api_mylist_add():
     shelf = get_shelf_by_name(current_user.id, 'To Read')
     if not shelf:
         return jsonify({'error': 'default shelf missing'}), 500
-    conn = get_db_connection(); cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT IGNORE INTO shelf_books (shelf_id, book_id) VALUES (%s, %s)", (shelf['id'], book_id))
-        conn.commit()
-        added = cursor.rowcount > 0
+    with get_db_connection() as conn:
+        res = conn.execute(text(
+            """
+            INSERT INTO shelf_books (shelf_id, book_id)
+            VALUES (:sid, :bid)
+            ON CONFLICT (shelf_id, book_id) DO NOTHING
+            """
+        ), {"sid": shelf['id'], "bid": book_id})
+        added = res.rowcount > 0
         return jsonify({'ok': True, 'shelf_id': shelf['id'], 'added': added})
-    finally:
-        cursor.close(); conn.close()
 
 # Lightweight health endpoint that avoids DB access
 @app.route('/health')
@@ -864,6 +827,8 @@ if __name__ == "__main__":
         ssl_context = (cert_path, key_path)
         logger.info("Starting Flask with HTTPS using cert=%s key=%s", cert_path, key_path)
     app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
         debug=os.getenv('FLASK_DEBUG') == '1' or os.getenv('DEBUG') == '1',
         ssl_context=ssl_context
     )
