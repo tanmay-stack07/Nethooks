@@ -45,6 +45,16 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
     logger.warning("DATABASE_URL is not set. Database operations will fail until it is configured.")
+# Normalize Postgres driver to psycopg (v3) to avoid psycopg2 dependency
+if DATABASE_URL:
+    try:
+        if DATABASE_URL.startswith("postgresql+psycopg2://"):
+            DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
+        elif DATABASE_URL.startswith("postgresql://"):
+            DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+    except Exception:
+        # Non-fatal: if normalization fails, proceed with the raw URL
+        pass
 engine = create_engine(DATABASE_URL, pool_pre_ping=True) if DATABASE_URL else None
 logger.debug("App configured from env")
 
